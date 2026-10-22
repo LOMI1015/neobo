@@ -90,7 +90,7 @@ curl --fail http://127.0.0.1:3000/api/ready
 
 ## 浏览器验证
 
-`pnpm check` 包含 jsdom 组件/交互测试；真实 Chromium 回归另由以下命令运行，CI 也执行同一入口：
+`pnpm check` 包含 jsdom 组件/交互测试。画布交互或渲染变更时，提交前在本地运行以下真实 Chromium 回归，并在 PR 中记录结果；CI 不安装或运行浏览器：
 
 ```bash
 pnpm --filter @neobo/scene build

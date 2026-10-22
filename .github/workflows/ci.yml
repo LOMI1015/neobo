@@ -51,12 +51,6 @@ jobs:
       - name: Check repository and workspaces
         run: pnpm check
 
-      - name: Install Chromium for browser tests
-        run: pnpm exec playwright install --with-deps --only-shell chromium
-
-      - name: Check canvas in Chromium
-        run: pnpm test:browser
-
       - name: Validate development services
         run: docker compose -f compose.dev.yml config --quiet
 

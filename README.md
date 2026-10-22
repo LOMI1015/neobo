@@ -36,7 +36,7 @@ pnpm dev
 
 执行 `pnpm check` 检查格式、文档、工作流规则，先按依赖顺序构建，再执行所有业务包的 `lint`、`typecheck`、`test`；缺少检查时 CI 失败。
 
-执行 `pnpm test:browser` 运行真实 Chromium 的画布回归；首次安装及系统依赖见 [本地开发指南](docs/local-development.md#浏览器验证)，CI 同样运行这项检查。
+画布交互或渲染变更时，在本地执行 `pnpm test:browser` 运行真实 Chromium 回归；首次安装及系统依赖见 [本地开发指南](docs/local-development.md#浏览器验证)。浏览器安装和回归由本地验收，CI 保留构建、类型、静态检查和单元/集成测试等基础门禁。
 
 ## 文档
 
