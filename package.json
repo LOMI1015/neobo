@@ -1,0 +1,49 @@
+{
+  "name": "neobo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AI-assisted, self-hosted visual dashboard platform",
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": "12.15.0"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others --names api,web \"pnpm --filter @neobo/api dev\" \"pnpm --filter @neobo/web dev\"",
+    "dev:setup": "node scripts/setup-development.mjs",
+    "dev:doctor": "node scripts/check-environment.mjs",
+    "infra:up": "docker compose -f compose.dev.yml up --detach --wait --wait-timeout 90",
+    "infra:down": "docker compose -f compose.dev.yml down",
+    "infra:logs": "docker compose -f compose.dev.yml logs --follow --tail 100",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "lint:docs": "node scripts/lint-markdown.mjs",
+    "check:repo": "node scripts/check-repository.mjs",
+    "check:workspaces": "node scripts/check-workspaces.mjs",
+    "test:tooling": "node --test scripts/check-tooling.test.mjs",
+    "audit:deps": "pnpm audit --audit-level high",
+    "check": "pnpm format:check && pnpm lint:docs && pnpm check:repo && pnpm test:tooling && pnpm check:workspaces"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "24.19.2",
+    "concurrently": "10.0.6",
+    "eslint": "10.13.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "github-slugger": "2.0.0",
+    "globals": "17.13.0",
+    "jsdom": "30.1.3",
+    "markdownlint": "0.42.0",
+    "mdast-util-from-markdown": "2.1.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.0",
+    "vitest": "5.0.5",
+    "yaml": "2.9.1"
+  }
+}
