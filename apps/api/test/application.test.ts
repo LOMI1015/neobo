@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApplication } from '../src/application.js';
 import { parseConfig } from '../src/config.js';
+import { createRuntimeLogging } from '../src/logging.js';
+import type { RuntimeLogging } from '../src/logging.js';
 
 const config = parseConfig({
   DATABASE_URL: 'postgresql://neobo:test-only-secret@127.0.0.1:15432/neobo',
@@ -10,16 +12,30 @@ const config = parseConfig({
 
 describe('NestJS + Fastify request lifecycle', () => {
   let app: NestFastifyApplication | undefined;
+  let logging: RuntimeLogging;
+  let logLines: string[];
+
+  beforeEach(() => {
+    logLines = [];
+    logging = createRuntimeLogging({
+      environment: 'test',
+      destination: { write: (line: string) => logLines.push(line) },
+    });
+  });
 
   afterEach(async () => {
-    await app?.close();
-    app = undefined;
+    try {
+      await app?.close();
+    } finally {
+      app = undefined;
+      await logging.close();
+    }
   });
 
   it('keeps liveness independent of unavailable databases', async () => {
     const postgres = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
     const redis = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
-    app = await createApplication(config, { postgres, redis });
+    app = await createApplication(config, { postgres, redis }, { logging });
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
 
@@ -34,10 +50,14 @@ describe('NestJS + Fastify request lifecycle', () => {
   });
 
   it('returns ready only when both dependencies answer', async () => {
-    app = await createApplication(config, {
-      postgres: () => Promise.resolve(true),
-      redis: () => Promise.resolve(true),
-    });
+    app = await createApplication(
+      config,
+      {
+        postgres: () => Promise.resolve(true),
+        redis: () => Promise.resolve(true),
+      },
+      { logging },
+    );
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
 
@@ -54,7 +74,7 @@ describe('NestJS + Fastify request lifecycle', () => {
       .fn<() => Promise<boolean>>()
       .mockRejectedValue(new Error(config.databaseUrl));
     const redis = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
-    app = await createApplication(config, { postgres, redis });
+    app = await createApplication(config, { postgres, redis }, { logging });
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
 
@@ -73,5 +93,30 @@ describe('NestJS + Fastify request lifecycle', () => {
     }
     expect(postgres).toHaveBeenCalledTimes(1);
     expect(redis).toHaveBeenCalledTimes(1);
+    const records: unknown[] = logLines.map((line) => {
+      const record: unknown = JSON.parse(line);
+      return record;
+    });
+    const completed = records.filter(
+      (record) =>
+        typeof record === 'object' &&
+        record !== null &&
+        'event' in record &&
+        record.event === 'http.completed',
+    );
+    expect(completed).toHaveLength(2);
+    for (const response of responses) {
+      expect(completed).toContainEqual(
+        expect.objectContaining({
+          requestId: response.headers['x-request-id'],
+          route: '/api/ready',
+          statusCode: 503,
+          outcome: 'failure',
+          errorCode: 'HTTP_SERVICE_UNAVAILABLE',
+        }),
+      );
+    }
+    expect(logLines.join('')).not.toContain('http.error');
+    expect(logLines.join('')).not.toContain('test-only-secret');
   });
 });

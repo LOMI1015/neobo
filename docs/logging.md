@@ -1,6 +1,6 @@
 # 日志与审计设计
 
-状态：目标设计，2026-10-23，**完整日志与审计尚未实现**。当前已提供开发终端美化、NestJS 框架日志显示及受控启动提示；Fastify 请求日志仍关闭，没有完整请求日志、链路上下文或审计表。终端显示不代表本设计的全部能力已经落地。
+状态：2026-10-23，**请求日志基础已实现，完整日志与持久审计仍按阶段推进**。NestJS 和 Fastify 共用 Pino，已提供受控事件、请求标识、AsyncLocalStorage 上下文与统一错误边界。审计表、任务传播和上线留存策略尚未实现，终端显示不代表全部设计已经落地。
 
 用户已确认：先确定架构，运行日志、审计日志的保存周期和容量上限在上线前确认，不在本文填写未经确认的数值。架构取舍见 [ADR 0002](decisions/0002-logging-and-audit.md)。
 
@@ -11,15 +11,15 @@
 | 运行日志 | 定位接口、查询、模型与后台任务的故障和耗时     | Pino 输出逐行 JSON 到标准输出，由容器或部署环境收集、轮转 |
 | 操作审计 | 回答谁在什么权限下对哪个对象做了什么、是否成功 | PostgreSQL 独立追加表，单独授权、查询和清理               |
 
-一期复用 Fastify 已使用的 Pino，NestJS 通过 `LoggerService` 对接同一日志实例；业务只调用统一入口。复用现有库的序列化、脱敏和输出能力，不自建日志引擎。桥接包若有必要，实施前核实其维护状态和当前 NestJS / Fastify 版本兼容性；代码直接使用的库必须声明直接依赖，不依赖传递安装。基础能力参考 [Fastify 日志文档](https://fastify.dev/docs/latest/Reference/Logging/) 与 [NestJS 日志接口](https://docs.nestjs.com/techniques/logger)。
+当前直接声明并复用 Fastify 已使用的 Pino 10.4.0，NestJS 通过 `LoggerService` 对接同一日志实例；业务只调用统一入口。复用现有库的序列化、脱敏和输出能力，不自建日志引擎。桥接包若有必要，实施前核实其维护状态和当前 NestJS / Fastify 版本兼容性；代码直接使用的库必须声明直接依赖，不依赖传递安装。基础能力参考 [Fastify 日志文档](https://fastify.dev/docs/latest/Reference/Logging/) 与 [NestJS 日志接口](https://docs.nestjs.com/techniques/logger)。
 
 起步不强制安装集中日志平台。后续需要跨主机检索时，在输出侧接入已有采集工具；需要完整调用链时采用 OpenTelemetry，不另造追踪协议。日志、耗时统计和审计各司其职，不靠打印每次渲染或每个 token 计算性能指标。
 
 ### 开发终端显示
 
-当前复用 Node.js 原生文字样式、concurrently 模块标签和 NestJS `ConsoleLogger`，不引入新的格式化引擎。开发终端显示模块颜色、原生日志时间和级别；非交互输出、CI 和 `NO_COLOR` 自动禁色。根启动器只显示通用启动提示，API 每次监听成功后输出一次静态 neobo 艺术字与监听摘要，不据此声称数据库可用。开发编译与监听采用同一 build 模式，避免首次重复编译造成多余重启。艺术字复用同一颜色策略，不增加字体生成依赖，生产不输出。
+当前复用 Node.js 原生文字样式、concurrently 模块标签和官方 `pino-pretty` 13.2.0。安全 JSON 先完成字段过滤，再由开发格式化器显示 UTC 时间、级别和事件；非交互输出、CI 和 `NO_COLOR` 自动禁色。根启动器只显示通用启动提示，API 每次监听成功后输出一次静态 neobo 艺术字与实际绑定地址、端口；健康检查路径为 `/api/health`，不据此声称数据库可用。开发编译与监听采用同一 build 模式，避免首次重复编译造成多余重启。艺术字复用同一颜色策略，不增加字体生成依赖，生产不输出。
 
-生产 API 通过 `start` 入口与 `NODE_ENV=production` 使用 `ConsoleLogger` 的无色 JSON 模式，不输出开发横幅；`pnpm dev` 固定使用开发模式。它是当前框架日志的显示配置，尚未实现前述统一 Pino 字段、请求上下文和审计事务。后续接入 Pino 时，开发展示优先采用官方生态的 `pino-pretty`，先核实版本兼容和必要性；生产继续输出机器可读 JSON。[ConsoleLogger 能力](https://docs.nestjs.com/techniques/logger)、[pino-pretty 的开发用途](https://github.com/pinojs/pino-pretty)。
+生产 API 通过 `start` 入口与 `NODE_ENV=production` 输出逐行无色 JSON，不加载开发格式化器；`pnpm dev` 固定使用开发模式。移除原 `ConsoleLogger` 入口，框架传来的任意原始消息只转换为固定 `framework.log` 事件，避免凭据和异常正文绕过控制。此实现不包含审计事务。[NestJS 日志接口](https://docs.nestjs.com/techniques/logger)、[pino-pretty 的开发用途](https://github.com/pinojs/pino-pretty)。
 
 ## 2. 字段和级别
 
@@ -38,6 +38,8 @@
 
 单条记录的字段、字符串长度、嵌套深度和总字节数必须有上限；不把错误码、消息、字段名当成任意外部输入。具体限制在实现时用测试验证，上线容量结合负载确定。
 
+当前实现只允许固定事件、错误码与平面标量字段，请求标识最多 64 字符、路由模板最多 256 字符、绑定地址最多 253 字符；未知字段、嵌套对象和原始框架消息均丢弃。边界样例验证完整 JSON 行小于 2 KiB；子日志不能追加 bindings 或覆盖序列化、脱敏配置。HTTP 实际请求标识仍一律由服务端生成 UUID。
+
 ## 3. 一次操作如何串起来
 
 HTTP 入口生成服务端 `requestId`，通过响应头 `X-Request-Id` 返回；不能直接信任浏览器提供的同名头。Fastify 的外部请求标识头不自带校验，接入时须显式配置。请求上下文使用 Node.js `AsyncLocalStorage`，同一请求的服务、查询和模型事件复用该标识，并通过并发测试证明不串号。[请求标识说明](https://fastify.dev/docs/latest/Reference/Server/#requestidheader)、[AsyncLocalStorage](https://nodejs.org/docs/latest-v24.x/api/async_context.html#class-asynclocalstorage)。
@@ -47,9 +49,10 @@ HTTP 入口生成服务端 `requestId`，通过响应头 `X-Request-Id` 返回�
 ## 4. 记录位置与错误处理
 
 - HTTP 层只负责一条完成摘要：方法、路由模板、状态、耗时和请求标识；不要把带查询参数的原始 URL 或动态路径直接记入。404 等没有匹配路由时使用固定标记。
+- 普通响应和连接中断共用一次性终态：`finish` / `onResponse` 或提前 `close` 只输出一条摘要并释放监听；取消时记录 `outcome: cancelled`，响应头尚未发送则省略状态码。畸形 URL 和超长路由参数等在普通钩子前失败的请求，通过 `frameworkErrors` 输出安全响应及固定未匹配摘要，不回显原始路径。
 - 请求摘要和异常详情分别只有一个负责位置。Fastify 自动日志、NestJS 拦截器、异常过滤器不得重复承担同一职责；同一失败可以有一条完成摘要和一条受控错误详情。
 - 业务服务只记录关键领域事件，不能每层捕获同一异常再重复打印。后台任务记录完成摘要，重试区分单次失败和最终失败。
-- 对外返回稳定错误码、必要提示和请求标识；内部异常只在统一边界转换成允许字段。启动失败也执行同样脱敏，日志初始化失败时保留最小安全的标准错误提示。
+- 统一异常响应返回 `statusCode`、稳定 `code`、必要提示 `message` 和 `requestId`；内部异常只在统一边界转换成允许字段。启动失败也执行同样脱敏，日志初始化失败时保留最小安全的标准错误提示。
 - 退出前停止接收新工作，在有时限的关闭流程中完成输出；不承诺异常断电下缓冲区绝不丢失。完整流式请求结束或取消时记摘要，不逐 token 打印。
 
 ## 5. 默认不记录什么
@@ -78,6 +81,8 @@ AI 事件只记录供应商 / 模型标识、阶段、耗时、工具名、结�
 ## 7. 资源、保存与部署
 
 运行日志走标准输出，文件轮转和磁盘配额交给部署环境；审计留在平台数据库。慢输出不得导致无限缓冲、无限重试或递归记录“日志写入失败”。采用成熟输出能力并明确队列上限、丢弃计数和降级规则，容量不足时优先减少低级别诊断输出，审计不随之丢弃。
+
+当前默认输出使用 Pino 原生异步 destination，缓冲上限 64 KiB，满时丢弃运行日志并计数，写入故障仅输出一次固定标准错误信号，不递归记录或回退到原对象。开发格式化同步复用 `prettyFactory`，不创建额外输出队列。默认关闭时限 1 秒，结束后释放自有输出资源；传入的测试输出流由调用者拥有，其容量由调用者管理，不纳入默认缓冲上限。此处的缓冲与关闭上限是实现保护，不代表已完成上线容量规划、轮转、告警或性能验收。
 
 异步 transport 能把输出处理移出主线程，但仍需处理背压和关闭；系统故障可能丢失尾部缓冲。因此它不能替代事务审计，也不能直接保证不阻塞或不丢日志。实施前验证所选输出方式在慢写和磁盘满时的行为，不自写 transport 框架。[Pino transport](https://github.com/pinojs/pino/blob/main/docs/transports.md#writing-a-transport)、[异步写入限制](https://github.com/pinojs/pino/blob/main/docs/asynchronous.md#caveats)。
 
