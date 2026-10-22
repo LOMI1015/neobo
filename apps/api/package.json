@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
+    "@neobo/scene": "workspace:*",
     "@nestjs/common": "12.2.0",
     "@nestjs/core": "12.2.0",
     "@nestjs/platform-fastify": "12.2.0",

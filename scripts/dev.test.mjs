@@ -55,10 +55,8 @@ test('disables both wrapper and child colors while retaining module labels', asy
       env,
       output: capture.output,
       run(commands, options) {
-        assert.deepEqual(
-          commands.map(({ name }) => name),
-          ['API', 'WEB'],
-        );
+        const names = commands.map(({ name }) => name);
+        assert.deepEqual(names, commands.length === 1 ? ['SCENE'] : ['SCENE', 'API', 'WEB']);
         assert.equal(options.prefix, '[{color}{name}{/color}]');
         assert.equal(options.prefixColors, false);
         assert.deepEqual(options.killOthersOn, ['success', 'failure']);
@@ -83,7 +81,10 @@ test('allows colored child output through pipes when the outer terminal supports
     env: {},
     output: capture.output,
     run(commands, options) {
-      assert.deepEqual(options.prefixColors, ['cyan', 'magenta']);
+      assert.deepEqual(
+        options.prefixColors,
+        commands.length === 1 ? ['gray'] : ['gray', 'cyan', 'magenta'],
+      );
       for (const command of commands) {
         assert.equal(command.env.NEOBO_DEV_COLORS, '1');
         assert.equal(command.env.FORCE_COLOR, '1');
@@ -96,15 +97,58 @@ test('allows colored child output through pipes when the outer terminal supports
   assert.doesNotMatch(capture.read(), /\u001b/u);
 });
 
-test('propagates failed commands and runner failures without printing untrusted errors', async () => {
-  for (const run of [
-    () => ({ result: Promise.reject(new Error('synthetic-sensitive-setting')) }),
-    () => {
-      throw new Error('synthetic-sensitive-setting');
+test('waits for the shared build before starting all development watchers', async () => {
+  const capture = captureOutput();
+  const calls = [];
+  let finishBuild;
+  const build = new Promise((resolve) => {
+    finishBuild = resolve;
+  });
+  const development = runDevelopment({
+    env: {},
+    output: capture.output,
+    run(commands, options) {
+      calls.push({ commands, options });
+      return { result: calls.length === 1 ? build : Promise.resolve([]) };
     },
-  ]) {
-    const capture = captureOutput();
-    assert.equal(await runDevelopment({ env: {}, output: capture.output, run }), 1);
-    assert.doesNotMatch(capture.read(), /synthetic-sensitive-setting/u);
+  });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(
+    calls[0].commands.map(({ command }) => command),
+    ['pnpm --filter @neobo/scene build'],
+  );
+  finishBuild([]);
+  assert.equal(await development, 0);
+  assert.deepEqual(
+    calls[1].commands.map(({ command }) => command),
+    [
+      'pnpm --filter @neobo/scene dev',
+      'pnpm --filter @neobo/api dev',
+      'pnpm --filter @neobo/web dev',
+    ],
+  );
+  assert.deepEqual(calls[1].options.killOthersOn, ['success', 'failure']);
+  assert.equal(calls[1].options.successCondition, 'all');
+});
+
+test('propagates failed commands and runner failures without printing untrusted errors', async () => {
+  for (const failedStage of [1, 2]) {
+    for (const throws of [false, true]) {
+      let calls = 0;
+      const capture = captureOutput();
+      const status = await runDevelopment({
+        env: {},
+        output: capture.output,
+        run() {
+          calls += 1;
+          if (calls !== failedStage) return { result: Promise.resolve([]) };
+          if (throws) throw new Error('synthetic-sensitive-setting');
+          return { result: Promise.reject(new Error('synthetic-sensitive-setting')) };
+        },
+      });
+      assert.equal(status, 1);
+      assert.equal(calls, failedStage);
+      assert.doesNotMatch(capture.read(), /synthetic-sensitive-setting/u);
+    }
   }
 });

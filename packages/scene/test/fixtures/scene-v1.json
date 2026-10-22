@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "example-scene",
+  "revision": 2,
+  "canvas": { "width": 1920, "height": 1080 },
+  "rootIds": ["group-1", "rectangle-1"],
+  "nodes": [
+    {
+      "id": "text-1",
+      "type": "text",
+      "componentVersion": 1,
+      "text": "文字与组合",
+      "transform": { "x": -20, "y": 30, "width": 200, "height": 50, "rotation": 15 },
+      "visible": true
+    },
+    {
+      "id": "group-1",
+      "type": "group",
+      "children": ["text-1"],
+      "transform": { "x": 100, "y": 100, "width": 400, "height": 200, "rotation": 0 },
+      "visible": true
+    },
+    {
+      "id": "rectangle-1",
+      "type": "rectangle",
+      "componentVersion": 1,
+      "transform": { "x": 600, "y": 100, "width": 100, "height": 100, "rotation": -45 },
+      "visible": false
+    }
+  ]
+}

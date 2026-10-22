@@ -32,8 +32,21 @@ export async function runDevelopment({
   };
 
   try {
+    // 与共享包监听使用同一增量构建模式，避免监听首启重复写入产物而重启 API。
+    await run(
+      [{ command: 'pnpm --filter @neobo/scene build', name: 'SCENE', env: childEnvironment }],
+      {
+        cwd: workspaceRoot,
+        outputStream: output,
+        prefix: '[{color}{name}{/color}]',
+        prefixColors: colors ? ['gray'] : false,
+        killOthersOn: ['success', 'failure'],
+        successCondition: 'all',
+      },
+    ).result;
     const { result } = run(
       [
+        { command: 'pnpm --filter @neobo/scene dev', name: 'SCENE', env: childEnvironment },
         { command: 'pnpm --filter @neobo/api dev', name: 'API', env: childEnvironment },
         { command: 'pnpm --filter @neobo/web dev', name: 'WEB', env: childEnvironment },
       ],
@@ -41,7 +54,7 @@ export async function runDevelopment({
         cwd: workspaceRoot,
         outputStream: output,
         prefix: '[{color}{name}{/color}]',
-        prefixColors: colors ? ['cyan', 'magenta'] : false,
+        prefixColors: colors ? ['gray', 'cyan', 'magenta'] : false,
         killOthersOn: ['success', 'failure'],
         successCondition: 'all',
       },

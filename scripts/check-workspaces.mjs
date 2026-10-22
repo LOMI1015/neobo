@@ -18,7 +18,8 @@ const ignoredDirectories = new Set([
 ]);
 const sourcePattern =
   /\.(?:[cm]?[jt]sx?|vue|svelte|astro|html|css|scss|sass|less|glsl|wgsl|sql|py|go|rs)$/i;
-export const requiredScripts = ['lint', 'typecheck', 'test', 'build'];
+// 先生成共享包产物，让消费者的类型检查、测试与 typed lint 在干净环境也能解析契约。
+export const requiredScripts = ['build', 'lint', 'typecheck', 'test'];
 
 async function entries(directory) {
   try {

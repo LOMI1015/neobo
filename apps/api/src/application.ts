@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
+import type { DynamicModule, Type } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter } from '@nestjs/platform-fastify';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -16,7 +17,10 @@ import type { RuntimeLogging } from './logging.js';
 export async function createApplication(
   config: ApiConfig,
   probes?: DependencyProbes,
-  options: { readonly logging?: RuntimeLogging } = {},
+  options: {
+    readonly logging?: RuntimeLogging;
+    readonly rootModule?: Type<unknown> | DynamicModule;
+  } = {},
 ): Promise<NestFastifyApplication> {
   const logging = options.logging ?? createRuntimeLogging();
   let adapter: FastifyAdapter | undefined;
@@ -36,7 +40,7 @@ export async function createApplication(
     const fastify = adapter.getInstance();
     registerHttpLogging(fastify, logging);
     const app = await NestFactory.create<NestFastifyApplication>(
-      AppModule.register(config, probes),
+      options.rootModule ?? AppModule.register(config, probes),
       adapter,
       { logger: logging.nest, abortOnError: false },
     );
