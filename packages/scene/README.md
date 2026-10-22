@@ -67,6 +67,14 @@ if (result.success) {
 
 当前内核同步管理单个内存会话，不提供跨进程并发、持久化、授权或外部副作用。后续服务端用例仍需在授权后原子比较并写入修订号，不能直接把通过参数校验的请求保存到数据库。
 
+## 可视操作规划
+
+`getNodeWorldCorners(document, nodeId)` 返回嵌套平移/中心旋转后的四角。`createTranslateCommandBatch(document, nodeIds, delta)` 接收场景逻辑像素位移，逆父世界旋转并去除被选祖先覆盖的后代；`createGroupCommandBatch(document, nodeIds, groupId)` 和 `createUngroupCommandBatch(document, groupId)` 规划保持画面几何的组合/拆组。
+
+规划输入是已有合法文档；成功返回包含当前场景标识与基础修订的 `batch`，只经原命令预验，不直接提交。调用方仍需交给历史执行。失败返回固定码，不暴露节点内容；修订号耗尽沿用 `REVISION_EXHAUSTED`。
+
+组合至少两个同级节点，允许非连续选择，新组占最高选中层；组内按原图层顺序排列，未选节点彼此顺序保持。组合/拆组最多 49 个直接目标；超出命令、节点、深度或数值限制时整批拒绝。拆组恢复位置/旋转及同级顺序，隐藏组合的直接子元素保持隐藏。边界和浏览器渲染含义见 [ADR 0005](../../docs/decisions/0005-canvas-editor.md)。
+
 ## 开发与检查
 
 包从 `dist` 导出 ESM 和声明，使用 `workspace:*` 依赖。根 `pnpm check` 先按依赖顺序构建，再运行所有包的 lint、typecheck、test；根 `pnpm dev` 先构建本包，再共同监听本包和应用。单独使用本包前先运行：

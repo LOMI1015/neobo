@@ -24,7 +24,8 @@
     "test:tooling": "node --test scripts/*.test.mjs",
     "check:pr": "node scripts/check-pull-request.mjs",
     "audit:deps": "pnpm audit --audit-level high",
-    "check": "pnpm format:check && pnpm lint:docs && pnpm check:repo && pnpm test:tooling && pnpm check:workspaces"
+    "check": "pnpm format:check && pnpm lint:docs && pnpm check:repo && pnpm test:tooling && pnpm check:workspaces",
+    "test:browser": "pnpm --filter @neobo/web test:browser"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -45,6 +46,7 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.0",
     "vitest": "5.0.5",
-    "yaml": "2.9.1"
+    "yaml": "2.9.1",
+    "@playwright/test": "1.64.1"
   }
 }

@@ -1,6 +1,6 @@
 # 本地开发
 
-当前提供 React + Vite 前端、NestJS + Fastify 后端，以及 PostgreSQL、Redis 的开发环境。前端是环境检查页；场景编辑、AI、主题和大屏功能尚未实现。
+当前提供 React + Vite 二维画布、NestJS + Fastify 后端，以及 PostgreSQL、Redis 开发环境。画布支持文字/矩形、选择拖动、属性编辑、组合/拆组及撤销/重做；内容仅在当前会话，刷新后不保存。场景存储、AI、主题和完整大屏仍未实现。
 
 ## 首次启动
 
@@ -22,6 +22,12 @@ pnpm dev
 `.nvmrc` 和 `.node-version` 固定 Node.js 24.22.1，`package.json` 固定 pnpm 12.15.0。若已使用相同版本，可跳过安装；无需全局安装 Nest CLI。`dev:setup` 从 `.env.example` 创建 `.env`，已有文件会保留，不覆盖个人配置。
 
 打开 <http://127.0.0.1:5173>。开发命令先构建共享场景包，再共同监听场景包、前端和后端；API 初次编译需稍等。按 `Ctrl+C` 停止前后端；数据库和 Redis 继续运行。
+
+默认进入空白画布；顶部“服务检查”保留原来的 API 状态检查，切换回来保留当前编辑。画布本身不等待 API 连接。添加元素后可直接拖动，按 Shift 多选或从图层选择子元素；属性修改点击“应用属性”后作为一步历史提交。删除组合包括全部后代；拆组保持画面位置，隐藏组合拆开后其直接子元素仍隐藏。
+
+只运行前端时，先执行 `pnpm --filter @neobo/scene build`，再运行 `pnpm --filter @neobo/web dev`；根 `pnpm dev` 仍统一管理前后端，任一服务启动失败时会停止关联开发进程。
+
+同级非连续元素允许组合，新组放在最上方选中元素所在层；组内保持原顺序，这可能改变与未选图层的遮挡关系。组合宽高定义边界与旋转中心，不缩放子元素；组合/拆组每次最多 49 个直接目标，超过范围会拒绝，不拆成多个历史步骤。
 
 ## 终端输出
 
@@ -53,7 +59,7 @@ LOG_LEVEL=debug pnpm dev
 
 | 服务       | 本机地址                | 用途                        |
 | ---------- | ----------------------- | --------------------------- |
-| 前端       | `http://127.0.0.1:5173` | 环境页与后续编辑器          |
+| 前端       | `http://127.0.0.1:5173` | 二维画布与服务检查          |
 | API        | `http://127.0.0.1:3000` | NestJS + Fastify            |
 | PostgreSQL | `127.0.0.1:15432`       | 开发数据库；容器内仍为 5432 |
 | Redis      | `127.0.0.1:16379`       | 开发缓存；容器内仍为 6379   |
@@ -80,7 +86,21 @@ curl --fail http://127.0.0.1:3000/api/health
 curl --fail http://127.0.0.1:3000/api/ready
 ```
 
-`/api/health` 返回成功，只代表 API 进程可响应。`/api/ready` 检查 PostgreSQL 和 Redis，两者可用时返回 HTTP 200，否则返回 503。环境页检查的是前一个接口，不能据此认定数据库已经就绪。
+`/api/health` 返回成功，只代表 API 进程可响应。`/api/ready` 检查 PostgreSQL 和 Redis，两者可用时返回 HTTP 200，否则返回 503。服务检查视图使用前一个接口，不能据此认定数据库已经就绪。
+
+## 浏览器验证
+
+`pnpm check` 包含 jsdom 组件/交互测试；真实 Chromium 回归另由以下命令运行，CI 也执行同一入口：
+
+```bash
+pnpm --filter @neobo/scene build
+pnpm exec playwright install --with-deps --only-shell chromium
+pnpm test:browser
+```
+
+Playwright 版本固定为 1.64.1，仅为开发依赖。浏览器安装步骤可能需要系统包权限；已具备运行库时可只执行 `pnpm exec playwright install --only-shell chromium`。具体系统支持以 [官方浏览器安装说明](https://playwright.dev/docs/browsers) 为准。
+
+测试自行启动 `127.0.0.1:4174` 的 Vite 服务，不复用已有进程，不需要数据库或真实 API。端口被占用时明确失败，结束后释放自己的服务与浏览器。失败 trace 和截图位于被忽略的 `apps/web/test-results/`；查阅后删除该目录即可，不提交临时报告。当前覆盖 Chromium 桌面和窄屏布局，未声称其他浏览器、真机触控或性能验收。
 
 ## 日常命令
 
