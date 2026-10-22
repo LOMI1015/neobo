@@ -15,17 +15,18 @@ pnpm install --frozen-lockfile --ignore-scripts
 pnpm check
 ```
 
-| 命令                       | 当前实际检查                                |
-| -------------------------- | ------------------------------------------- |
-| `pnpm format:check`        | Prettier 检查文档、配置、脚本和应用源码     |
-| `pnpm lint:docs`           | Markdown 结构与格式                         |
-| `pnpm check:repo`          | 本地 Markdown 链接及锚点、YAML 和工作流策略 |
-| `pnpm test:tooling`        | 仓库、工作流和中文 PR 检查工具的回归测试    |
-| `pnpm check:workspaces`    | 检查业务包配置，存在时依次执行真实检查      |
-| `pnpm audit:deps`          | 查询依赖漏洞通告，高危及以上失败；需要网络  |
-| `pnpm check:pr <事件文件>` | 检查事件 JSON 中 PR 的中文标题与正文        |
+| 命令                       | 当前实际检查                                  |
+| -------------------------- | --------------------------------------------- |
+| `pnpm format:check`        | Prettier 检查文档、配置、脚本和应用源码       |
+| `pnpm lint:docs`           | Markdown 结构与格式                           |
+| `pnpm check:repo`          | 本地 Markdown 链接及锚点、YAML 和工作流策略   |
+| `pnpm test:tooling`        | 仓库、工作流和中文 PR 检查工具的回归测试      |
+| `pnpm check:workspaces`    | 检查业务包配置，存在时依次执行真实检查        |
+| `pnpm test:browser`        | 本地验收：Chromium 画布行为回归，不在 CI 执行 |
+| `pnpm audit:deps`          | 查询依赖漏洞通告，高危及以上失败；需要网络    |
+| `pnpm check:pr <事件文件>` | 检查事件 JSON 中 PR 的中文标题与正文          |
 
-`pnpm check` 运行表中前五项，无需访问生产服务或真实模型。外部网页不纳入链接检查，避免网络波动影响本地文档检查；其内容仍由评审者核对。
+`pnpm check` 运行格式、文档、仓库、工具测试和工作区检查，无需生产服务或真实模型。浏览器回归在本地单独执行，先构建共享包并安装匹配 Chromium，见 [本地开发](local-development.md#浏览器验证)。画布交互或渲染变更时在提交前运行，并在 PR 中记录结果。外部网页不纳入链接检查，避免网络波动影响文档检查；其内容仍由评审者核对。
 
 修改工作流还需使用 actionlint 1.7.12 检查：
 
@@ -45,6 +46,8 @@ CI 从官方发布下载 actionlint，并校验仓库固定的 SHA-256。更新�
 稳定的必需检查名为 **`quality`**，来源为 **CI** 工作流。启用分支保护时选择这项检查。工作流不使用路径过滤，也不因文档变更跳过整个检查。
 
 检查顺序：固定工具链 → 冻结锁文件安装 → PR 中文标题与正文 → `pnpm check` → 开发 Compose 配置校验 → 依赖漏洞审计 → actionlint。任何一步失败，整个检查失败；任务有超时，新 PR 提交会取消过时检查，`main` 检查不互相取消。
+
+按维护者确认，CI 优先拦截构建失败、类型错误、静态违规和核心行为回归等合并风险。浏览器安装、真实浏览器回归和性能验证放在本地按变更风险验收，PR 提供实际结果；CI 不安装浏览器或额外系统包。单元测试及无需外部基础服务的集成测试继续由 `pnpm check` 执行，不因浏览器移至本地而省略。
 
 PR 标题和正文使用中文，标题保留 Conventional Commits 前缀，如 `feat(scene): 新增场景分组命令`。使用 squash merge，并将标题用作合并提交标题。单个历史提交格式暂不由 CI 强制，填写规则见 [中文 PR 与 AI 提交流程](pull-requests.md)。
 
@@ -71,7 +74,7 @@ PR 事件运行 `pnpm check:pr`，从 `GITHUB_EVENT_PATH` 读取标题和正文�
 
 评审还需核对 [开发规范](development.md) 中的成熟方案复用、事实依据、简洁注释和用户确认记录。日志改动按 [日志设计](logging.md#8-落地顺序与验收) 补充脱敏、关联、审计与资源验证；文档设计完成不等于这些运行能力已实现，静态检查也不能替代语义评审。
 
-当前使用 TypeScript 6.0.3、ESLint 10、typescript-eslint 和 Vitest 5，具体精确版本以根清单与锁文件为准。TypeScript 保持在 typescript-eslint 支持范围内，升级时先检查兼容性。共享严格配置见 [tsconfig.base.json](../tsconfig.base.json) 和 [eslint.config.mjs](../eslint.config.mjs)。前端使用 Testing Library + jsdom 验证交互，后端使用真实 Fastify 注入验证请求链路；浏览器关键流程后续接入 Playwright。
+当前使用 TypeScript 6.0.3、ESLint 10、typescript-eslint 和 Vitest 5，具体精确版本以根清单与锁文件为准。TypeScript 保持在 typescript-eslint 支持范围内，升级时先检查兼容性。共享严格配置见 [tsconfig.base.json](../tsconfig.base.json) 和 [eslint.config.mjs](../eslint.config.mjs)。前端使用 Testing Library + jsdom 验证组件交互，Playwright 1.64.1 的 Chromium 验证画布真实坐标、捕获、取消和布局；后端使用真实 Fastify 注入验证请求链路。Vitest 只收集 Web 的 `src` 测试，浏览器测试单独位于 `e2e`，两者均受类型和静态检查覆盖。
 
 日常检查使用供应商模拟、固定数据和隔离测试服务。权限、缓存、迁移、Fastify 请求链路及场景命令按 [开发规范](development.md) 增加集成验证。数据库集成测试使用临时数据库，测试完成后清理。
 

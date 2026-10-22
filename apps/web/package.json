@@ -9,11 +9,13 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:browser": "playwright test --config playwright.config.ts"
   },
   "dependencies": {
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "@neobo/scene": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "19.3.0",

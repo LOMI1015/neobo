@@ -33,3 +33,10 @@ export type {
   SceneHistoryOptions,
   SceneHistoryResult,
 } from './history.js';
+export {
+  createGroupCommandBatch,
+  createTranslateCommandBatch,
+  createUngroupCommandBatch,
+  getNodeWorldCorners,
+} from './geometry.js';
+export type { SceneCommandPlanResult, SceneGeometryErrorCode, ScenePoint } from './geometry.js';
