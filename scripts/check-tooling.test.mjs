@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -139,23 +139,76 @@ test('workspace commands execute sequentially through pnpm without skipping scri
   });
   assert.deepEqual(
     calls.map((call) => call.args),
-    Object.keys(scripts).map((script) => ['/tools/pnpm.cjs', '-r', 'run', script]),
+    ['build', 'lint', 'typecheck', 'test'].map((script) => [
+      '/tools/pnpm.cjs',
+      '-r',
+      'run',
+      script,
+    ]),
   );
   assert.ok(
     calls.every(
       (call) => call.executable === process.execPath && call.options.cwd === '/repository',
     ),
   );
-  let attempts = 0;
-  assert.throws(
-    () =>
-      runWorkspaceChecks('/repository', '/tools/pnpm.cjs', () => {
-        attempts += 1;
-        return { status: 7 };
-      }),
-    (error) => /failed/.test(error.message) && error.exitCode === 7,
+  for (const [index, script] of ['build', 'lint', 'typecheck', 'test'].entries()) {
+    let attempts = 0;
+    assert.throws(
+      () =>
+        runWorkspaceChecks('/repository', '/tools/pnpm.cjs', () => ({
+          status: attempts++ === index ? 7 : 0,
+        })),
+      (error) => error.message === `Workspace ${script} failed (7).` && error.exitCode === 7,
+    );
+    assert.equal(attempts, index + 1);
+  }
+});
+
+test('a clean workspace builds dependency artifacts before its consumers and all checks', async (t) => {
+  const producerScripts = Object.fromEntries(
+    Object.keys(scripts).map((script) => [script, `node check.mjs ${script}`]),
   );
-  assert.equal(attempts, 1);
+  const root = await fixture(t, {
+    'package.json': JSON.stringify({ name: 'workspace-check-fixture', private: true }),
+    'pnpm-workspace.yaml': workspaceConfig,
+    'packages/producer/package.json': JSON.stringify({
+      name: '@fixture/producer',
+      version: '0.0.0',
+      type: 'module',
+      scripts: producerScripts,
+    }),
+    'packages/producer/check.mjs': `
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+const script = process.argv[2];
+if (script === 'build') {
+  mkdirSync(new URL('./dist/', import.meta.url), { recursive: true });
+  writeFileSync(new URL('./dist/index.js', import.meta.url), 'export const sceneVersion = 1;');
+}
+const { sceneVersion } = await import('./dist/index.js');
+if (sceneVersion !== 1) throw new Error('Invalid dependency artifact.');
+appendFileSync(new URL('../../checks.txt', import.meta.url), 'producer:' + script + '\\n');
+`,
+    'apps/consumer/package.json': JSON.stringify({
+      name: '@fixture/consumer',
+      version: '0.0.0',
+      type: 'module',
+      scripts: producerScripts,
+      dependencies: { '@fixture/producer': 'workspace:*' },
+    }),
+    'apps/consumer/check.mjs': `
+import { appendFileSync } from 'node:fs';
+import { sceneVersion } from '../../packages/producer/dist/index.js';
+if (sceneVersion !== 1) throw new Error('Invalid dependency artifact.');
+appendFileSync(new URL('../../checks.txt', import.meta.url), 'consumer:' + process.argv[2] + '\\n');
+`,
+  });
+  runWorkspaceChecks(root, process.env.npm_execpath ?? 'pnpm');
+  assert.equal(
+    await readFile(path.join(root, 'checks.txt'), 'utf8'),
+    ['build', 'lint', 'typecheck', 'test']
+      .flatMap((script) => [`producer:${script}`, `consumer:${script}`])
+      .join('\n') + '\n',
+  );
 });
 
 test('native pnpm and Windows executables run directly, while unsafe shell wrappers fail clearly', () => {
@@ -165,7 +218,7 @@ test('native pnpm and Windows executables run directly, while unsafe shell wrapp
       calls.push({ command, args });
       return { status: 0 };
     });
-    assert.deepEqual(calls[0], { command: executable, args: ['-r', 'run', 'lint'] });
+    assert.deepEqual(calls[0], { command: executable, args: ['-r', 'run', 'build'] });
     assert.equal(calls.length, 4);
   }
   assert.throws(() => pnpmCommand('C:\\tools\\pnpm.cmd'), /native pnpm executable/);
