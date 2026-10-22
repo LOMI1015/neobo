@@ -1,6 +1,6 @@
 # CI/CD 规则
 
-状态：2026-10-22。**CI 已配置，需推送后验证 GitHub 实际运行；CD 为确定的实施规则，当前没有发布或部署工作流。** 当前已有前后端开发骨架，业务包的静态检查、类型检查、测试和构建均接入统一检查。
+状态：2026-10-23。**CI 已配置，需推送后验证 GitHub 实际运行；CD 为确定的实施规则，当前没有发布或部署工作流。** 当前已有前后端开发骨架，业务包的静态检查、类型检查、测试和构建均接入统一检查。
 
 CI 是每次提交的自动检查；CD 是将通过检查的版本制作成制品、发布并部署。检查通过不等于获得合并或上线授权。
 
@@ -15,14 +15,15 @@ pnpm install --frozen-lockfile --ignore-scripts
 pnpm check
 ```
 
-| 命令                    | 当前实际检查                                |
-| ----------------------- | ------------------------------------------- |
-| `pnpm format:check`     | Prettier 检查文档、配置、脚本和应用源码     |
-| `pnpm lint:docs`        | Markdown 结构与格式                         |
-| `pnpm check:repo`       | 本地 Markdown 链接及锚点、YAML 和工作流策略 |
-| `pnpm test:tooling`     | 检查工具对漏配、坏链接和错误配置的回归测试  |
-| `pnpm check:workspaces` | 检查业务包配置，存在时依次执行真实检查      |
-| `pnpm audit:deps`       | 查询依赖漏洞通告，高危及以上失败；需要网络  |
+| 命令                       | 当前实际检查                                |
+| -------------------------- | ------------------------------------------- |
+| `pnpm format:check`        | Prettier 检查文档、配置、脚本和应用源码     |
+| `pnpm lint:docs`           | Markdown 结构与格式                         |
+| `pnpm check:repo`          | 本地 Markdown 链接及锚点、YAML 和工作流策略 |
+| `pnpm test:tooling`        | 仓库、工作流和中文 PR 检查工具的回归测试    |
+| `pnpm check:workspaces`    | 检查业务包配置，存在时依次执行真实检查      |
+| `pnpm audit:deps`          | 查询依赖漏洞通告，高危及以上失败；需要网络  |
+| `pnpm check:pr <事件文件>` | 检查事件 JSON 中 PR 的中文标题与正文        |
 
 `pnpm check` 运行表中前五项，无需访问生产服务或真实模型。外部网页不纳入链接检查，避免网络波动影响本地文档检查；其内容仍由评审者核对。
 
@@ -38,14 +39,16 @@ CI 从官方发布下载 actionlint，并校验仓库固定的 SHA-256。更新�
 
 [CI 工作流](../.github/workflows/ci.yml) 在以下事件运行：
 
-- PR 创建、代码更新、重新打开、标题编辑、转为可评审。
+- PR 创建、代码更新、重新打开、标题或正文编辑、转为可评审。
 - 推送到 `main`、合并队列检查，以及手动触发。
 
 稳定的必需检查名为 **`quality`**，来源为 **CI** 工作流。启用分支保护时选择这项检查。工作流不使用路径过滤，也不因文档变更跳过整个检查。
 
-检查顺序：固定工具链 → 冻结锁文件安装 → PR 标题 → `pnpm check` → 开发 Compose 配置校验 → 依赖漏洞审计 → actionlint。任何一步失败，整个检查失败；任务有超时，新 PR 提交会取消过时检查，`main` 检查不互相取消。
+检查顺序：固定工具链 → 冻结锁文件安装 → PR 中文标题与正文 → `pnpm check` → 开发 Compose 配置校验 → 依赖漏洞审计 → actionlint。任何一步失败，整个检查失败；任务有超时，新 PR 提交会取消过时检查，`main` 检查不互相取消。
 
-PR 标题采用 Conventional Commits，如 `feat(scene): add group commands`。使用 squash merge，并将标题用作合并提交标题。单个历史提交格式暂不由 CI 强制。
+PR 标题和正文使用中文，标题保留 Conventional Commits 前缀，如 `feat(scene): 新增场景分组命令`。使用 squash merge，并将标题用作合并提交标题。单个历史提交格式暂不由 CI 强制，填写规则见 [中文 PR 与 AI 提交流程](pull-requests.md)。
+
+PR 事件运行 `pnpm check:pr`，从 `GITHUB_EVENT_PATH` 读取标题和正文，检查标题格式、中文描述以及正文中的实际中文说明。模板标题、注释、代码、网址和勾选清单不计入正文。它只能拦截常见漏填与纯英文内容，说明是否准确完整仍需评审。Dependabot 等机器人的 PR 也适用，合并前由维护者改写为中文。其他事件跳过这项元数据检查，脚本的回归测试仍由 `pnpm check` 执行。
 
 依赖审计无法连接服务时视为检查未完成，需重试，不能通过 `|| true` 放行。依赖问题修复或正式替代前，不把检测失败改成成功。
 
@@ -66,6 +69,8 @@ PR 标题采用 Conventional Commits，如 `feat(scene): add group commands`。�
 
 脚本检测只能拦截常见漏配和占位；维护者仍需确认检查覆盖实际源码。禁止把业务代码放在检查范围外，禁止新增 `--if-present`、`--passWithNoTests`、无条件跳过或吞掉错误。
 
+评审还需核对 [开发规范](development.md) 中的成熟方案复用、事实依据、简洁注释和用户确认记录。日志改动按 [日志设计](logging.md#8-落地顺序与验收) 补充脱敏、关联、审计与资源验证；文档设计完成不等于这些运行能力已实现，静态检查也不能替代语义评审。
+
 当前使用 TypeScript 6.0.3、ESLint 10、typescript-eslint 和 Vitest 5，具体精确版本以根清单与锁文件为准。TypeScript 保持在 typescript-eslint 支持范围内，升级时先检查兼容性。共享严格配置见 [tsconfig.base.json](../tsconfig.base.json) 和 [eslint.config.mjs](../eslint.config.mjs)。前端使用 Testing Library + jsdom 验证交互，后端使用真实 Fastify 注入验证请求链路；浏览器关键流程后续接入 Playwright。
 
 日常检查使用供应商模拟、固定数据和隔离测试服务。权限、缓存、迁移、Fastify 请求链路及场景命令按 [开发规范](development.md) 增加集成验证。数据库集成测试使用临时数据库，测试完成后清理。
@@ -78,7 +83,7 @@ PR 标题采用 Conventional Commits，如 `feat(scene): add group commands`。�
 - checkout 使用 `persist-credentials: false`，不保留可用于后续 Git 操作的凭据。
 - 所有远程 Action 固定完整提交 SHA，旁注版本方便审核；Docker Action 固定镜像 digest。Dependabot 定期提出更新，由维护者审核。
 - 禁止通过 `pull_request_target` 或带写权限的后续任务执行 PR 中的代码、脚本和制品。
-- PR 标题等不可信字段通过环境变量传入，不拼接到 shell 源码。
+- PR 标题和正文从 GitHub 事件 JSON 文件读取，仅作为数据处理，不拼接到 shell 源码。
 - 发布写权限只授予受信发布任务；不同用途使用最小权限，不能为了方便将整个 CI 改为写权限。
 - 普通 CI 不部署、不发布、不自动合并。缓存不能包含凭据和敏感查询结果。
 

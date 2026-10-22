@@ -10,7 +10,7 @@
     "pnpm": "12.15.0"
   },
   "scripts": {
-    "dev": "concurrently --kill-others --names api,web \"pnpm --filter @neobo/api dev\" \"pnpm --filter @neobo/web dev\"",
+    "dev": "node scripts/dev.mjs",
     "dev:setup": "node scripts/setup-development.mjs",
     "dev:doctor": "node scripts/check-environment.mjs",
     "infra:up": "docker compose -f compose.dev.yml up --detach --wait --wait-timeout 90",
@@ -21,7 +21,8 @@
     "lint:docs": "node scripts/lint-markdown.mjs",
     "check:repo": "node scripts/check-repository.mjs",
     "check:workspaces": "node scripts/check-workspaces.mjs",
-    "test:tooling": "node --test scripts/check-tooling.test.mjs",
+    "test:tooling": "node --test scripts/*.test.mjs",
+    "check:pr": "node scripts/check-pull-request.mjs",
     "audit:deps": "pnpm audit --audit-level high",
     "check": "pnpm format:check && pnpm lint:docs && pnpm check:repo && pnpm test:tooling && pnpm check:workspaces"
   },

@@ -32,20 +32,24 @@ pnpm dev
 
 打开 <http://127.0.0.1:5173>。后端位于 `127.0.0.1:3000`，开发数据库和 Redis 使用 `15432`、`16379` 端口。完整步骤与故障处理见 [本地开发指南](docs/local-development.md)。
 
+开发终端以 `[API]` / `[WEB]` 彩色标签区分服务；`NO_COLOR=1 pnpm dev` 可关闭颜色，非交互输出自动使用纯文本。
+
 执行 `pnpm check` 检查格式、文档、工作流规则，以及所有业务包的 `lint`、`typecheck`、`test`、`build`；缺少检查时 CI 失败。
 
 ## 文档
 
-| 入口                                  | 内容                              |
-| ------------------------------------- | --------------------------------- |
-| [AGENTS.md](AGENTS.md)                | AI 开发阅读顺序与执行约束         |
-| [架构方案](docs/architecture.md)      | 产品边界、模块、主题、数据与 AI   |
-| [开发规范](docs/development.md)       | 代码边界、测试、评审和变更规则    |
-| [CI/CD 规则](docs/ci-cd.md)           | 自动检查、GitHub 设置、发布与回滚 |
-| [GitHub 设置](docs/github-setup.md)   | 分支保护、单人审批与后续多人协作  |
-| [本地开发](docs/local-development.md) | 安装、启动、端口与常见故障        |
-| [路线图](docs/roadmap.md)             | 分阶段目标和验收条件              |
-| [迭代记录](docs/iterations/README.md) | 已完成工作、证据与后续任务        |
-| [参与贡献](CONTRIBUTING.md)           | 提交方式与协作流程                |
+| 入口                                  | 内容                               |
+| ------------------------------------- | ---------------------------------- |
+| [AGENTS.md](AGENTS.md)                | AI 开发阅读顺序与执行约束          |
+| [架构方案](docs/architecture.md)      | 产品边界、模块、主题、数据与 AI    |
+| [开发规范](docs/development.md)       | 代码边界、测试、评审和变更规则     |
+| [日志与审计](docs/logging.md)         | 请求追踪、脱敏、操作审计与保存策略 |
+| [CI/CD 规则](docs/ci-cd.md)           | 自动检查、GitHub 设置、发布与回滚  |
+| [GitHub 设置](docs/github-setup.md)   | 分支保护、单人审批与后续多人协作   |
+| [中文 PR 流程](docs/pull-requests.md) | 合并请求模板与 AI 自动提交约定     |
+| [本地开发](docs/local-development.md) | 安装、启动、端口与常见故障         |
+| [路线图](docs/roadmap.md)             | 分阶段目标和验收条件               |
+| [迭代记录](docs/iterations/README.md) | 已完成工作、证据与后续任务         |
+| [参与贡献](CONTRIBUTING.md)           | 提交方式与协作流程                 |
 
 许可证待维护者确定，首次正式发布前补充 `LICENSE`。

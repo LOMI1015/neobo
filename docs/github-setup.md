@@ -18,7 +18,7 @@ GitHub 要求可选的必需检查在该仓库最近七天内成功运行过。P
 - 关闭 merge commit 和 rebase 两种合并方式。
 - 可开启合并后自动删除分支。
 
-日常从 `main` 创建 `feat/*`、`fix/*` 等短期分支，通过 PR 合入；PR 标题使用 Conventional Commits，例如 `feat(scene): add group commands`。这是 neobo 的协作约定；GitHub 合并方式的设置见 [官方说明](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/configuring-commit-squashing-for-pull-requests)。
+日常从 `main` 创建 `feat/*`、`fix/*` 等短期分支，通过 PR 合入；PR 标题和正文使用中文，标题保留 Conventional Commits 前缀，例如 `feat(scene): 新增场景分组命令`，详见 [模板与提交流程](pull-requests.md)。这是 neobo 的协作约定；GitHub 合并方式的设置见 [官方说明](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/configuring-commit-squashing-for-pull-requests)。
 
 ## 3. 创建 main 的 Ruleset
 
