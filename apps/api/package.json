@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm build && concurrently --kill-others \"tsc -p tsconfig.build.json --watch --preserveWatchOutput\" \"node --watch dist/main.js\"",
+    "dev": "tsc --build tsconfig.build.json --force && concurrently --kill-others --prefix none \"tsc --build tsconfig.build.json --watch --preserveWatchOutput\" \"node --watch --watch-preserve-output dist/main.js\"",
     "start": "node dist/main.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

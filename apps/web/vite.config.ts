@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    clearScreen: false,
     envDir: workspaceRoot,
     server: {
       host: '127.0.0.1',
