@@ -19,6 +19,7 @@ describe('NestJS + Fastify request lifecycle', () => {
     logLines = [];
     logging = createRuntimeLogging({
       environment: 'test',
+      level: 'info',
       destination: { write: (line: string) => logLines.push(line) },
     });
   });
@@ -30,6 +31,63 @@ describe('NestJS + Fastify request lifecycle', () => {
       app = undefined;
       await logging.close();
     }
+  });
+
+  it('suppresses Nest initialization and native Fastify listen noise at the default info level', async () => {
+    app = await createApplication(config, undefined, { logging });
+    await app.listen(0, '127.0.0.1');
+    expect(logLines).toEqual([]);
+
+    logging.write('info', 'server.listening', { host: '127.0.0.1', port: 3000 });
+    const response = await app.inject({ method: 'GET', url: '/api/health' });
+    expect(response.statusCode).toBe(200);
+    logging.nest.warn('synthetic-warning-secret', 'NestApplication');
+    logging.nest.error(new Error('synthetic-error-secret'), 'stack', 'ExceptionHandler');
+    const records = logLines.map((line) => {
+      const value: unknown = JSON.parse(line);
+      return value;
+    });
+    expect(records).toEqual([
+      expect.objectContaining({ event: 'server.listening', level: 30 }),
+      expect.objectContaining({ event: 'http.completed', level: 30, statusCode: 200 }),
+      expect.objectContaining({
+        event: 'framework.log',
+        level: 40,
+        frameworkSource: 'NestApplication',
+      }),
+      expect.objectContaining({
+        event: 'framework.log',
+        level: 50,
+        frameworkSource: 'ExceptionHandler',
+      }),
+    ]);
+    expect(logLines.join('')).not.toContain('synthetic-');
+  });
+
+  it('shows fixed framework sources when debug is explicitly enabled for a real listener', async () => {
+    await logging.close();
+    logging = createRuntimeLogging({
+      environment: 'test',
+      level: 'debug',
+      destination: { write: (line: string) => logLines.push(line) },
+    });
+    app = await createApplication(config, undefined, { logging });
+    await app.listen(0, '127.0.0.1');
+    const output = logLines.join('');
+    for (const source of [
+      'NestFactory',
+      'InstanceLoader',
+      'RoutesResolver',
+      'RouterExplorer',
+      'NestApplication',
+    ]) {
+      expect(output).toContain(`"frameworkSource":"${source}"`);
+    }
+    expect(output).toContain('"level":20');
+    expect(output).not.toContain('Server listening at');
+    expect(output).not.toContain('Starting Nest application');
+    expect(output).not.toContain('dependencies initialized');
+    expect(output).not.toContain(config.databaseUrl);
   });
 
   it('keeps liveness independent of unavailable databases', async () => {

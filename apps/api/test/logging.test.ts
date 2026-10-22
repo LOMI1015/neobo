@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import pino from 'pino';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRuntimeLogging } from '../src/logging.js';
 import type { RuntimeLogging } from '../src/logging.js';
 
@@ -41,6 +41,10 @@ describe('controlled runtime logging', () => {
   const loggers: RuntimeLogging[] = [];
   const directories: string[] = [];
 
+  beforeEach(() => {
+    vi.stubEnv('LOG_LEVEL', undefined);
+  });
+
   afterEach(async () => {
     await Promise.all(loggers.splice(0).map((logging) => logging.close()));
     vi.restoreAllMocks();
@@ -65,7 +69,7 @@ describe('controlled runtime logging', () => {
     await logging.close();
 
     const records = sink.records();
-    expect(records).toHaveLength(3);
+    expect(records).toHaveLength(2);
     expect(records[0]).toMatchObject({
       schemaVersion: 1,
       service: 'neobo-api',
@@ -78,12 +82,94 @@ describe('controlled runtime logging', () => {
     });
     expect(records[0]?.time).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(records.every((record) => record.instanceId === records[0]?.instanceId)).toBe(true);
-    expect(records[1]).toMatchObject({ event: 'framework.log', msg: '框架运行事件', level: 30 });
-    expect(records[2]).toMatchObject({ event: 'framework.log', msg: '框架运行事件', level: 50 });
+    expect(records[1]).toMatchObject({ event: 'framework.log', msg: '框架运行事件', level: 50 });
     expect(sink.output()).not.toContain('Starting application');
     expect(sink.output()).not.toContain('synthetic-secret');
     expect(sink.destination.destroyed).toBe(false);
     expect(sink.destination.listenerCount('error')).toBe(0);
+  });
+
+  it('hides routine framework events by default while preserving controlled info and failures', () => {
+    const sink = capture();
+    const logging = create({ destination: sink.destination, environment: 'development' });
+    logging.nest.log('Starting application', 'NestFactory');
+    logging.nest.debug?.('Scanning modules', 'InstanceLoader');
+    logging.nest.verbose?.('Detailed trace', 'RouterExplorer');
+    logging.pino.info('Server listening at http://127.0.0.1:3000');
+    logging.pino.child({}).info({ event: 'uncontrolled', password: 'synthetic-secret' });
+    expect(sink.records()).toEqual([]);
+
+    logging.write('info', 'server.listening', { host: '127.0.0.1', port: 3000 });
+    logging.write('info', 'http.completed', { method: 'GET', statusCode: 200 });
+    logging.nest.warn('Warning body', 'NestApplication');
+    logging.nest.error(new Error('Error body'), 'Stack body', 'ExceptionHandler');
+    logging.nest.fatal?.('Fatal body', 'UnknownContext');
+    logging.pino.warn('Warning body');
+    logging.pino.error(new Error('Error body'));
+    logging.pino.fatal('Fatal body');
+
+    expect(sink.records().map((record) => record.level)).toEqual([30, 30, 40, 50, 60, 40, 50, 60]);
+    expect(sink.records()[2]).toMatchObject({ frameworkSource: 'NestApplication' });
+    expect(sink.records()[3]).toMatchObject({ frameworkSource: 'ExceptionHandler' });
+    expect(sink.records()[4]).toMatchObject({ frameworkSource: 'unknown' });
+    expect(sink.output()).not.toContain('body');
+    expect(sink.output()).not.toContain('synthetic-secret');
+  });
+
+  it('allows explicit debug diagnostics with fixed framework sources and without raw text', () => {
+    vi.stubEnv('LOG_LEVEL', 'debug');
+    const sink = capture();
+    const logging = create({ destination: sink.destination, environment: 'test' });
+    const secret = 'synthetic-debug-secret';
+    const getter = vi.fn(() => {
+      throw new Error(secret);
+    });
+    const context = Object.defineProperty({}, 'toString', { get: getter });
+    logging.nest.log(secret, 'NestFactory');
+    logging.nest.log(secret, 'InstanceLoader');
+    logging.nest.debug?.(secret, 'RouterExplorer');
+    logging.nest.log(secret, context);
+    logging.nest.error(new Error(secret), secret, secret);
+    logging.pino.info({ password: secret, frameworkSource: secret }, secret);
+    logging.pino.child({ password: secret }).info(secret);
+    logging.nest.verbose?.(secret, 'NestFactory');
+
+    expect(sink.records()).toHaveLength(7);
+    expect(sink.records().map((record) => record.level)).toEqual([20, 20, 20, 20, 50, 20, 20]);
+    expect(
+      sink
+        .records()
+        .slice(0, 5)
+        .map((record) => record.frameworkSource),
+    ).toEqual(['NestFactory', 'InstanceLoader', 'RouterExplorer', 'unknown', 'unknown']);
+    expect(sink.records()[5]).not.toHaveProperty('frameworkSource');
+    expect(sink.records()[6]).not.toHaveProperty('frameworkSource');
+    expect(getter).not.toHaveBeenCalled();
+    expect(sink.output()).not.toContain(secret);
+  });
+
+  it('honors the configured threshold for native debug, trace and controlled events', () => {
+    const traceSink = capture();
+    const trace = create({ destination: traceSink.destination, level: 'trace' });
+    trace.nest.verbose?.('Hidden original trace', 'RouterExplorer');
+    trace.pino.trace('Hidden original trace');
+    trace.pino.debug('Hidden original debug');
+    expect(traceSink.records().map((record) => record.level)).toEqual([10, 10, 20]);
+
+    vi.stubEnv('LOG_LEVEL', 'error');
+    const sink = capture();
+    const logging = create({ destination: sink.destination });
+    logging.write('info', 'server.listening');
+    logging.nest.warn('Hidden warning');
+    logging.pino.info('Hidden framework info');
+    logging.nest.error('Retained error');
+    logging.nest.fatal?.('Retained fatal');
+    expect(sink.records().map((record) => record.level)).toEqual([50, 60]);
+
+    const overrideSink = capture();
+    const override = create({ destination: overrideSink.destination, level: 'info' });
+    override.write('info', 'server.stopped');
+    expect(overrideSink.records()).toHaveLength(1);
   });
 
   it('does not serialize request bodies, credentials, SQL, AI text or raw error causes', () => {
@@ -135,7 +221,7 @@ describe('controlled runtime logging', () => {
 
   it('never invokes unknown getters or serialization hooks, including throwing proxies', () => {
     const sink = capture();
-    const logging = create({ destination: sink.destination, environment: 'test' });
+    const logging = create({ destination: sink.destination, environment: 'test', level: 'debug' });
     const getter = vi.fn(() => {
       throw new Error('synthetic-getter-secret');
     });
@@ -152,6 +238,7 @@ describe('controlled runtime logging', () => {
         errorCode: { get: getter },
         host: { get: getter },
         port: { get: getter },
+        frameworkSource: { get: getter },
         toJSON: { value: getter },
       },
     );
@@ -178,7 +265,7 @@ describe('controlled runtime logging', () => {
 
   it('keeps child bindings, custom formatters and repeated setBindings from bypassing safety', () => {
     const sink = capture();
-    const logging = create({ destination: sink.destination, environment: 'test' });
+    const logging = create({ destination: sink.destination, environment: 'test', level: 'debug' });
     const secret = 'synthetic-child-secret';
     const customFormatter = vi.fn(() => ({ password: secret }));
     let child = logging.pino.child(
@@ -217,6 +304,7 @@ describe('controlled runtime logging', () => {
       statusCode: 599,
       outcome: 'cancelled',
       errorCode: 'HTTP_SERVER_ERROR',
+      frameworkSource: 'ExceptionsHandler',
       huge: 'sensitive'.repeat(100_000),
     });
     logging.pino.info({
@@ -230,6 +318,7 @@ describe('controlled runtime logging', () => {
       durationMs: Infinity,
       outcome: 'secret',
       errorCode: 'UNTRUSTED_ERROR_SECRET',
+      frameworkSource: 'synthetic-secret',
     });
     for (const line of sink.output().trim().split('\n'))
       expect(Buffer.byteLength(line)).toBeLessThan(2048);
@@ -239,6 +328,7 @@ describe('controlled runtime logging', () => {
     expect(sink.records()[1]).not.toHaveProperty('host');
     expect(sink.records()[1]).not.toHaveProperty('durationMs');
     expect(sink.records()[1]).not.toHaveProperty('errorCode');
+    expect(sink.records()[1]).not.toHaveProperty('frameworkSource');
     expect(sink.output()).not.toContain('synthetic-secret');
   });
 
@@ -411,6 +501,16 @@ describe('controlled runtime logging', () => {
     expect(() => create({ closeTimeoutMs: Infinity })).toThrow('日志关闭时限无效');
     expect(destination).not.toHaveBeenCalled();
   });
+
+  it.each(['', 'DEBUG', 'silent', 'debug\n', 'postgresql://synthetic-log-level-secret'])(
+    'rejects invalid LOG_LEVEL before allocating output without exposing its value: %j',
+    (level) => {
+      vi.stubEnv('LOG_LEVEL', level);
+      const destination = vi.spyOn(pino, 'destination');
+      expect(() => create()).toThrow(/^日志级别配置无效。$/);
+      expect(destination).not.toHaveBeenCalled();
+    },
+  );
 
   it('formats development output with the official prettifier and obeys NO_COLOR', async () => {
     vi.stubEnv('NO_COLOR', '1');

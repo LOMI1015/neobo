@@ -19,7 +19,9 @@
 
 当前复用 Node.js 原生文字样式、concurrently 模块标签和官方 `pino-pretty` 13.2.0。安全 JSON 先完成字段过滤，再由开发格式化器显示 UTC 时间、级别和事件；非交互输出、CI 和 `NO_COLOR` 自动禁色。根启动器只显示通用启动提示，API 每次监听成功后输出一次静态 neobo 艺术字与实际绑定地址、端口；健康检查路径为 `/api/health`，不据此声称数据库可用。开发编译与监听采用同一 build 模式，避免首次重复编译造成多余重启。艺术字复用同一颜色策略，不增加字体生成依赖，生产不输出。
 
-生产 API 通过 `start` 入口与 `NODE_ENV=production` 输出逐行无色 JSON，不加载开发格式化器；`pnpm dev` 固定使用开发模式。移除原 `ConsoleLogger` 入口，框架传来的任意原始消息只转换为固定 `framework.log` 事件，避免凭据和异常正文绕过控制。此实现不包含审计事务。[NestJS 日志接口](https://docs.nestjs.com/techniques/logger)、[pino-pretty 的开发用途](https://github.com/pinojs/pino-pretty)。
+生产 API 通过 `start` 入口与 `NODE_ENV=production` 输出逐行无色 JSON，不加载开发格式化器；`pnpm dev` 固定使用开发模式。NestJS 的常规 `log` 和未声明受控事件的原生 Pino / Fastify `info` 归入 `debug`，默认启动只显示监听成功等业务状态，不再重复显示无信息的“框架运行事件”；`warn`、`error`、`fatal` 保持原级别。框架原始消息仍只转换为固定 `framework.log` 事件，避免凭据和异常正文绕过控制。此实现不包含审计事务。[NestJS 日志接口](https://docs.nestjs.com/techniques/logger)、[Pino 级别阈值与日志钩子](https://github.com/pinojs/pino/blob/main/docs/api.md)、[pino-pretty 的开发用途](https://github.com/pinojs/pino-pretty)。
+
+按需使用 `LOG_LEVEL=debug pnpm dev` 查看框架初始化来源。`LOG_LEVEL` 默认 `info`，允许 `trace`、`debug`、`info`、`warn`、`error`、`fatal`；它是启动前的进程环境变量，不从根 `.env` 读取。非法值在创建输出资源前失败，错误不回显配置原值。更高级别会过滤较低级别的运行事件，审计设计不受运行日志级别控制。
 
 ## 2. 字段和级别
 
@@ -28,6 +30,7 @@
 | `schemaVersion`、`time`、`level`                  | 日志格式版本、UTC 时间、级别；时间统一格式                         |
 | `service`、`environment`、`version`、`instanceId` | 区分 API / Worker、环境、发布版本和进程实例                        |
 | `event`、`msg`                                    | 稳定英文事件名和简短说明；不拼接用户正文                           |
+| `frameworkSource`                                 | 框架来源只允许已核实的 NestJS 固定 context；未知来源不回显原值     |
 | `requestId`                                       | 本次 HTTP 请求标识；无 HTTP 上下文时可缺省                         |
 | `traceId`、`spanId`                               | 启用 OpenTelemetry 后由其 SDK 生成；未启用时缺省，不用请求标识冒充 |
 | `projectId`、`actorId`                            | 仅从已验证的服务端身份和权限上下文取得，不使用邮箱或姓名           |
@@ -38,7 +41,7 @@
 
 单条记录的字段、字符串长度、嵌套深度和总字节数必须有上限；不把错误码、消息、字段名当成任意外部输入。具体限制在实现时用测试验证，上线容量结合负载确定。
 
-当前实现只允许固定事件、错误码与平面标量字段，请求标识最多 64 字符、路由模板最多 256 字符、绑定地址最多 253 字符；未知字段、嵌套对象和原始框架消息均丢弃。边界样例验证完整 JSON 行小于 2 KiB；子日志不能追加 bindings 或覆盖序列化、脱敏配置。HTTP 实际请求标识仍一律由服务端生成 UUID。
+当前实现只允许固定事件、错误码与平面标量字段，请求标识最多 64 字符、路由模板最多 256 字符、绑定地址最多 253 字符；未知字段、嵌套对象和原始框架消息均丢弃。`frameworkSource` 仅接受 `NestFactory`、`InstanceLoader`、`RoutesResolver`、`RouterExplorer`、`NestApplication`、`ExceptionsHandler`、`ExceptionHandler` 和 `unknown`；NestJS 未知 context 使用 `unknown`，无法确定来源的原生 Pino 日志不伪造模块名。调试输出也不记录原始消息、异常、堆栈、路由参数或任意 context。边界样例验证完整 JSON 行小于 2 KiB；子日志不能追加 bindings 或覆盖序列化、脱敏配置。HTTP 实际请求标识仍一律由服务端生成 UUID。
 
 ## 3. 一次操作如何串起来
 

@@ -9,7 +9,24 @@ import type { DestinationStream, Logger } from 'pino';
 import type * as PinoPretty from 'pino-pretty';
 import { consoleColorsEnabled } from './console-display.js';
 
-export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+const logLevels = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const;
+export type LogLevel = (typeof logLevels)[number];
+
+const frameworkSources = [
+  'NestFactory',
+  'InstanceLoader',
+  'RoutesResolver',
+  'RouterExplorer',
+  'NestApplication',
+  'ExceptionsHandler',
+  'ExceptionHandler',
+  'unknown',
+] as const;
+type FrameworkSource = (typeof frameworkSources)[number];
+
+function validFrameworkSource(value: unknown): value is FrameworkSource {
+  return frameworkSources.some((source) => source === value);
+}
 
 const messages = {
   'http.completed': 'HTTP 请求已完成',
@@ -32,6 +49,7 @@ export interface LogFields {
   readonly errorCode?: LogErrorCode;
   readonly host?: string;
   readonly port?: number;
+  readonly frameworkSource?: FrameworkSource;
 }
 
 export interface RuntimeLogging {
@@ -105,6 +123,7 @@ function safeFields(value: unknown): LogFields {
     errorCode?: LogErrorCode;
     host?: string;
     port?: number;
+    frameworkSource?: FrameworkSource;
   } = {};
   const requestId = dataProperty(value, 'requestId');
   if (validRequestId(requestId)) fields.requestId = requestId;
@@ -146,13 +165,17 @@ function safeFields(value: unknown): LogFields {
   const port = dataProperty(value, 'port');
   if (typeof port === 'number' && Number.isInteger(port) && port >= 0 && port <= 65535)
     fields.port = port;
+  const frameworkSource = dataProperty(value, 'frameworkSource');
+  if (validFrameworkSource(frameworkSource)) fields.frameworkSource = frameworkSource;
   return fields;
 }
 
+function validEvent(value: unknown): value is LogEvent {
+  return typeof value === 'string' && Object.hasOwn(messages, value);
+}
+
 function safeEvent(value: unknown): LogEvent {
-  return typeof value === 'string' && Object.hasOwn(messages, value)
-    ? (value as LogEvent)
-    : 'framework.log';
+  return validEvent(value) ? value : 'framework.log';
 }
 
 function packageVersion(): string {
@@ -168,12 +191,17 @@ export function createRuntimeLogging(
   options: {
     readonly destination?: DestinationStream;
     readonly environment?: string;
+    readonly level?: LogLevel;
     readonly closeTimeoutMs?: number;
   } = {},
 ): RuntimeLogging {
   const environment = options.environment ?? process.env.NODE_ENV ?? 'development';
   if (!['development', 'test', 'production'].includes(environment)) {
     throw new Error('日志环境配置无效。');
+  }
+  const level = options.level ?? process.env.LOG_LEVEL ?? 'info';
+  if (!logLevels.some((candidate) => candidate === level)) {
+    throw new Error('日志级别配置无效。');
   }
   const closeTimeoutMs = options.closeTimeoutMs ?? 1000;
   if (!Number.isInteger(closeTimeoutMs) || closeTimeoutMs < 1 || closeTimeoutMs > 10_000) {
@@ -257,7 +285,7 @@ export function createRuntimeLogging(
 
     const logger = pino(
       {
-        level: 'info',
+        level,
         base: {
           schemaVersion: 1,
           service: 'neobo-api',
@@ -290,13 +318,19 @@ export function createRuntimeLogging(
           remove: true,
         },
         hooks: {
-          logMethod(args, method) {
+          logMethod(args, method, level) {
             if (closed) return;
             const input: unknown = args[0];
-            const event = safeEvent(dataProperty(input, 'event'));
+            const inputEvent = dataProperty(input, 'event');
+            const event = safeEvent(inputEvent);
             const fields = safeFields(input);
             const requestId = context.getStore();
             const record = { ...fields, ...(requestId ? { requestId } : {}), event };
+            if (level === 30 && !validEvent(inputEvent)) {
+              // 原生框架 info 仅转发一次；固定 event 终止转发并遵守 debug 阈值。
+              this.debug(record);
+              return;
+            }
             method.apply(this, [record, messages[event]]);
           },
         },
@@ -353,13 +387,20 @@ export function createRuntimeLogging(
     const write: RuntimeLogging['write'] = (level, event, fields) => {
       logger[level]({ ...safeFields(fields), event: safeEvent(event) });
     };
+    const framework = (level: LogLevel, optionalParams: readonly unknown[]): void => {
+      // Nest 将 context 放在末尾；仅记录已核实的固定来源，不回显任意 context。
+      const source = optionalParams.at(-1);
+      write(level, 'framework.log', {
+        frameworkSource: validFrameworkSource(source) ? source : 'unknown',
+      });
+    };
     const nest: LoggerService = {
-      log: () => write('info', 'framework.log'),
-      error: () => write('error', 'framework.log'),
-      warn: () => write('warn', 'framework.log'),
-      debug: () => write('debug', 'framework.log'),
-      verbose: () => write('trace', 'framework.log'),
-      fatal: () => write('fatal', 'framework.log'),
+      log: (_message: unknown, ...params: unknown[]) => framework('debug', params),
+      error: (_message: unknown, ...params: unknown[]) => framework('error', params),
+      warn: (_message: unknown, ...params: unknown[]) => framework('warn', params),
+      debug: (_message: unknown, ...params: unknown[]) => framework('debug', params),
+      verbose: (_message: unknown, ...params: unknown[]) => framework('trace', params),
+      fatal: (_message: unknown, ...params: unknown[]) => framework('fatal', params),
     };
 
     const close = (): Promise<void> => {
