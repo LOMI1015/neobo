@@ -50,14 +50,19 @@ describe('开发环境 API 连接检查', () => {
     expect(await screen.findByText('服务已连接')).toBeVisible();
   });
 
-  it('有效健康响应显示服务已连接，并明确业务功能尚未实现', async () => {
+  it('有效健康响应保留连接反馈，不展示功能介绍或开发计划', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(healthyResponse()));
 
     render(<DevelopmentStatus />);
 
     expect(await screen.findByText('服务已连接')).toBeVisible();
     expect(screen.getByRole('button', { name: '重新检查' })).toBeEnabled();
-    expect(screen.getByText('二维画布已接入统一命令；以下能力仍在后续计划中。')).toBeVisible();
+    expect(screen.getByRole('heading', { name: '服务检查' })).toBeVisible();
+    expect(screen.queryByText('从一张白板开始')).not.toBeInTheDocument();
+    expect(screen.queryByText('接下来构建')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('检查本地 API 连接。画布编辑可以独立使用，无需等待服务连接。'),
+    ).not.toBeInTheDocument();
   });
 
   it('连接失败后可以重试，重试成功恢复正常状态', async () => {

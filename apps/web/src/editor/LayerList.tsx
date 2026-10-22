@@ -1,6 +1,7 @@
 import type { MouseEvent } from 'react';
 import type { SceneDocument, SceneNode } from '@neobo/scene';
 import { nodeTitle } from './selection';
+import { Button } from '../components/ui/button';
 
 interface LayerListProps {
   readonly document: SceneDocument;
@@ -25,8 +26,12 @@ export function LayerList({
     const hidden = ancestorHidden || !node.visible;
     return (
       <li key={node.id}>
-        <div className={`editor-layer-row${selectedIds.includes(node.id) ? ' is-selected' : ''}`}>
-          <button
+        <div
+          data-editor-node-id={node.id}
+          className={`editor-layer-row${selectedIds.includes(node.id) ? ' is-selected' : ''}`}
+        >
+          <Button
+            variant="ghost"
             className="editor-layer-select"
             type="button"
             disabled={disabled}
@@ -44,8 +49,10 @@ export function LayerList({
                 {hidden ? (ancestorHidden ? ' · 随组合隐藏' : ' · 隐藏') : ''}
               </span>
             </span>
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             className="editor-layer-visibility"
             type="button"
             disabled={disabled}
@@ -53,7 +60,7 @@ export function LayerList({
             onClick={() => onToggleVisible(node)}
           >
             {node.visible ? '显' : '隐'}
-          </button>
+          </Button>
         </div>
         {node.type === 'group' && node.children.length > 0 && (
           <ul>{[...node.children].reverse().map((id) => renderLayer(id, hidden))}</ul>
@@ -68,11 +75,7 @@ export function LayerList({
     </ul>
   ) : (
     <div className="editor-sidebar-empty">
-      <span className="editor-empty-symbol" aria-hidden="true">
-        ▱
-      </span>
       <p>还没有元素</p>
-      <span>从上方添加文字或矩形。</span>
     </div>
   );
 }

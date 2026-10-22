@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, loadEnv } from 'vite';
 
 const workspaceRoot = fileURLToPath(new URL('../../', import.meta.url));
@@ -12,7 +13,10 @@ export default defineConfig(({ mode }) => {
     `http://127.0.0.1:${process.env.API_PORT ?? env.API_PORT ?? '3000'}`;
 
   return {
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
+    resolve: {
+      alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    },
     clearScreen: false,
     envDir: workspaceRoot,
     server: {

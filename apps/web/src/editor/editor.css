@@ -1,170 +1,103 @@
 .editor {
-  --editor-border: #e2e6eb;
-  --editor-muted: #697586;
-  color: #253246;
-  font-size: 13px;
-}
-
-.editor button {
-  min-height: 34px;
-  padding: 7px 12px;
-  border-color: var(--editor-border);
-  border-radius: 5px;
-  color: #354256;
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.editor button:hover:not(:disabled) {
-  border-color: #a8b2c0;
-  background: #f4f6f9;
-}
-
-.editor button:disabled {
-  color: #a1a9b5;
-  cursor: not-allowed;
+  color: var(--foreground);
+  font-size: var(--text-sm);
 }
 
 .editor-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 13px 24px;
-  border-bottom: 1px solid var(--editor-border);
-  background: #fff;
+  gap: calc(var(--spacing) * 3);
+  padding: calc(var(--spacing) * 3) calc(var(--spacing) * 6);
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
 }
 
 .editor-tool-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: calc(var(--spacing) * 2);
 }
 
 .editor-tool-group + .editor-tool-group {
-  padding-left: 12px;
-  border-left: 1px solid var(--editor-border);
-}
-
-.editor-tool-group button > span {
-  display: inline-block;
-  min-width: 17px;
-  font-weight: 600;
+  padding-left: calc(var(--spacing) * 3);
+  border-left: 1px solid var(--border);
 }
 
 .editor-history-tools {
   margin-left: auto;
 }
 
-.editor button.editor-delete:not(:disabled) {
-  color: #a54545;
-}
-
 .editor-session {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  padding: 9px 24px;
-  color: var(--editor-muted);
-  background: #fafbfd;
-  font-size: 12px;
+  gap: calc(var(--spacing) * 4);
+  padding: calc(var(--spacing) * 2) calc(var(--spacing) * 6);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
 }
 
 .editor-session-dot {
   display: inline-block;
-  width: 5px;
-  height: 5px;
-  margin: 0 7px 2px 0;
+  width: var(--spacing);
+  height: var(--spacing);
+  margin: 0 calc(var(--spacing) * 2) var(--spacing) 0;
   border-radius: 50%;
-  background: #b49c64;
+  background: var(--warning);
 }
 
 .editor-error {
-  padding: 10px 24px;
-  border-top: 1px solid #eed6d3;
-  border-bottom: 1px solid #eed6d3;
-  color: #9d3831;
-  background: #fff4f2;
-  line-height: 1.6;
+  padding: calc(var(--spacing) * 3) calc(var(--spacing) * 6);
+  border-block: 1px solid color-mix(in srgb, var(--destructive) 25%, transparent);
+  color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 8%, var(--background));
+  line-height: var(--text-sm--line-height);
 }
 
 .editor-workspace {
   display: grid;
-  grid-template-columns: 216px minmax(0, 1fr) 252px;
-  min-height: calc(100dvh - 161px);
-  border-top: 1px solid var(--editor-border);
+  grid-template-columns: calc(var(--spacing) * 54) minmax(0, 1fr) calc(var(--spacing) * 63);
+  min-height: calc(100dvh - var(--spacing) * 40);
+  border-top: 1px solid var(--border);
 }
 
 .editor-sidebar {
   min-width: 0;
-  background: #fff;
+  background: var(--card);
 }
 
 .editor-layer-panel {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--editor-border);
+  border-right: 1px solid var(--border);
 }
 
 .editor-property-panel {
-  border-left: 1px solid var(--editor-border);
+  border-left: 1px solid var(--border);
 }
 
 .editor-panel-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 51px;
-  padding: 0 17px;
-  border-bottom: 1px solid #eef0f3;
+  min-height: calc(var(--spacing) * 13);
+  padding: 0 calc(var(--spacing) * 4);
+  border-bottom: 1px solid var(--border);
 }
 
 .editor-panel-heading h2 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
 }
 
 .editor-panel-heading > span {
-  color: #94a0b0;
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
 }
 
 .editor-sidebar-empty {
-  padding: 46px 18px;
+  padding: calc(var(--spacing) * 12) calc(var(--spacing) * 4);
+  color: var(--muted-foreground);
   text-align: center;
-}
-
-.editor-empty-symbol {
-  display: block;
-  margin-bottom: 16px;
-  color: #adb6c3;
-  font-size: 25px;
-  line-height: 1;
-}
-
-.editor-sidebar-empty p {
-  margin: 0 0 7px;
-  color: #5b687a;
-  font-size: 13px;
-}
-
-.editor-sidebar-empty > span:last-child {
-  color: #8490a1;
-  font-size: 12px;
-  line-height: 1.8;
-}
-
-.editor-help {
-  color: var(--editor-muted);
-  font-size: 11px;
-  line-height: 1.8;
-}
-
-.editor-layer-help {
-  margin: auto 0 0;
-  padding: 18px 16px;
-  border-top: 1px solid #eef0f3;
 }
 
 .editor-layers,
@@ -175,48 +108,48 @@
 }
 
 .editor-layers {
-  padding: 8px 5px 18px;
+  padding: calc(var(--spacing) * 2) var(--spacing) calc(var(--spacing) * 4);
 }
 
 .editor-layers ul {
-  margin-left: 14px;
-  border-left: 1px solid #edf0f5;
+  margin-left: calc(var(--spacing) * 3);
+  border-left: 1px solid var(--border);
 }
 
 .editor-layer-row {
   display: flex;
   align-items: center;
-  gap: 2px;
-  border-radius: 4px;
+  gap: var(--spacing);
+  border-radius: var(--radius);
 }
 
 .editor-layer-row.is-selected {
-  background: #eaf0fa;
+  background: var(--accent);
 }
 
-.editor .editor-layer-select {
+.editor-layer-select {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 9px;
+  justify-content: flex-start;
+  gap: calc(var(--spacing) * 2);
   min-width: 0;
-  padding: 9px 7px;
-  border: 0;
-  background: transparent;
+  height: auto;
+  min-height: calc(var(--spacing) * 12);
   text-align: left;
 }
 
 .editor-layer-icon {
   flex-shrink: 0;
-  width: 19px;
-  color: #78869a;
+  width: calc(var(--spacing) * 4);
+  color: var(--muted-foreground);
   text-align: center;
 }
 
 .editor-layer-name {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--spacing);
   overflow: hidden;
 }
 
@@ -226,26 +159,20 @@
 }
 
 .editor-layer-id {
-  color: #8a95a5;
-  font-size: 10px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
 }
 
-.editor .editor-layer-visibility {
-  min-height: 28px;
-  margin-right: 4px;
-  padding: 4px;
-  border: 0;
-  color: #8a95a5;
-  background: transparent;
-  font-size: 10px;
+.editor-layer-visibility {
+  margin-right: var(--spacing);
 }
 
 .editor-stage-panel {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 0 28px;
-  background: #edf0f4;
+  padding: 0 calc(var(--spacing) * 7);
+  background: var(--canvas-surround);
 }
 
 .editor-canvas-heading,
@@ -254,15 +181,15 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  min-height: 51px;
-  color: #7b8797;
-  font-size: 11px;
+  gap: calc(var(--spacing) * 2);
+  min-height: calc(var(--spacing) * 13);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
 }
 
 .editor-canvas-heading > span:first-child {
-  color: #5e6c7e;
-  font-weight: 500;
+  color: var(--foreground);
+  font-weight: var(--font-weight-medium);
 }
 
 .editor-stage {
@@ -270,8 +197,8 @@
   display: grid;
   flex: 1;
   align-content: center;
-  min-height: 320px;
-  padding: 24px 0;
+  min-height: calc(var(--spacing) * 80);
+  padding: calc(var(--spacing) * 6) 0;
 }
 
 .editor-canvas {
@@ -279,171 +206,108 @@
   width: 100%;
   height: auto;
   max-height: 68dvh;
-  background: #fff;
-  box-shadow:
-    0 2px 5px #25324609,
-    0 12px 35px #2532460a;
+  background: var(--canvas-surface);
+  box-shadow: 0 calc(var(--spacing) * 3) calc(var(--spacing) * 8)
+    color-mix(in srgb, var(--foreground) 8%, transparent);
   touch-action: none;
   user-select: none;
 }
 
-.editor-canvas-empty {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 11px;
-  padding: 25px;
-  color: #9aa5b4;
-  text-align: center;
-  pointer-events: none;
-}
-
-.editor-canvas-empty strong {
-  color: #77869a;
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: 1px;
-}
-
-.editor-canvas-empty span {
-  font-size: 12px;
-  line-height: 1.8;
-}
-
 .editor-selection polygon {
   fill: none;
-  stroke: #5278ba;
+  stroke: var(--ring);
   stroke-width: 1.5px;
   vector-effect: non-scaling-stroke;
 }
 
 .editor-properties {
-  padding: 20px 17px;
+  padding: calc(var(--spacing) * 5) calc(var(--spacing) * 4);
 }
 
 .editor-node-heading {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 25px;
+  gap: var(--spacing);
+  margin-bottom: calc(var(--spacing) * 6);
 }
 
 .editor-node-heading strong {
-  font-size: 14px;
-  font-weight: 550;
+  font-weight: var(--font-weight-semibold);
 }
 
 .editor-node-heading > span {
   overflow-wrap: anywhere;
-  color: #8a95a5;
-  font-size: 11px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
 }
 
 .editor-properties fieldset {
+  /* 内容驱动的文本域不能撑破窄屏属性面板。 */
+  min-inline-size: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
 .editor-properties legend {
-  margin-bottom: 14px;
+  margin-bottom: calc(var(--spacing) * 3);
   padding: 0;
-  color: #7b8797;
-  font-size: 11px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
 }
 
 .editor-field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 10px;
+  gap: calc(var(--spacing) * 4) calc(var(--spacing) * 3);
 }
 
 .editor-field-grid label,
 .editor-text-field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  color: #697586;
-  font-size: 11px;
+  gap: calc(var(--spacing) * 2);
+  font-size: var(--text-xs);
+}
+
+.editor-field-grid label > span,
+.editor-text-field > span {
+  color: var(--muted-foreground);
 }
 
 .editor-field-wide {
   grid-column: 1 / -1;
 }
 
-.editor-properties input:not([type='checkbox']),
-.editor-properties textarea {
-  width: 100%;
-  min-width: 0;
-  padding: 9px;
-  border: 1px solid #dce2ea;
-  border-radius: 4px;
-  color: #354256;
-  background: #fff;
-  font: inherit;
-  font-size: 12px;
-}
-
-.editor-properties input:focus-visible,
-.editor-properties textarea:focus-visible {
-  outline: 2px solid #8aa4cf;
-  outline-offset: 1px;
-}
-
-.editor-properties textarea {
-  resize: vertical;
-  line-height: 1.7;
-}
-
 .editor-text-field {
-  margin-top: 20px;
+  margin-top: calc(var(--spacing) * 5);
 }
 
 .editor-checkbox {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-top: 20px;
-  color: #5e6c7e;
-  font-size: 12px;
-}
-
-.editor-checkbox input {
-  accent-color: #5278ba;
-}
-
-.editor-properties .editor-help {
-  margin: 17px 0;
+  gap: calc(var(--spacing) * 2);
+  margin-top: calc(var(--spacing) * 5);
 }
 
 .editor-field-error {
-  color: #9d3831;
-  font-size: 12px;
+  margin-top: calc(var(--spacing) * 4);
+  color: var(--destructive);
+  font-size: var(--text-xs);
 }
 
-.editor .editor-apply {
+.editor-apply {
   width: 100%;
-  color: #fff;
-  border-color: #35465f;
-  background: #35465f;
-}
-
-.editor .editor-apply:hover:not(:disabled) {
-  color: #fff;
-  border-color: #263951;
-  background: #263951;
+  margin-top: calc(var(--spacing) * 5);
 }
 
 @media (max-width: 1080px) {
   .editor-workspace {
-    grid-template-columns: 180px minmax(0, 1fr) 222px;
+    grid-template-columns: calc(var(--spacing) * 45) minmax(0, 1fr) calc(var(--spacing) * 56);
   }
 
   .editor-stage-panel {
-    padding: 0 18px;
+    padding: 0 calc(var(--spacing) * 4);
   }
 }
 
@@ -459,7 +323,7 @@
   }
 
   .editor-stage {
-    min-height: 250px;
+    min-height: calc(var(--spacing) * 64);
   }
 
   .editor-canvas {
@@ -471,19 +335,19 @@
   }
 
   .editor-sidebar {
-    border-top: 1px solid var(--editor-border);
+    border-top: 1px solid var(--border);
   }
 
   .editor-toolbar,
   .editor-session {
-    padding-right: 16px;
-    padding-left: 16px;
+    padding-right: calc(var(--spacing) * 4);
+    padding-left: calc(var(--spacing) * 4);
   }
 }
 
 @media (max-width: 480px) {
   .editor-toolbar {
-    gap: 8px;
+    gap: calc(var(--spacing) * 2);
   }
 
   .editor-history-tools {
@@ -495,20 +359,15 @@
     border-left: 0;
   }
 
-  .editor-session {
-    gap: 8px;
-    font-size: 10px;
-  }
-
   .editor-stage-panel {
-    padding: 0 16px;
+    padding: 0 calc(var(--spacing) * 4);
   }
 
   .editor-sidebar-empty {
-    padding: 30px 12px;
+    padding: calc(var(--spacing) * 8) calc(var(--spacing) * 3);
   }
 
   .editor-properties {
-    padding: 17px 12px;
+    padding: calc(var(--spacing) * 4) calc(var(--spacing) * 3);
   }
 }

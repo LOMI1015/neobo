@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 type HealthState = { status: 'pending' } | { status: 'ok' } | { status: 'error'; message: string };
 
@@ -69,11 +70,7 @@ export function DevelopmentStatus() {
 
   return (
     <main className="development-page">
-      <section className="introduction" aria-labelledby="page-title">
-        <p className="eyebrow">从一张白板开始</p>
-        <h1 id="page-title">服务检查</h1>
-        <p>检查本地 API 连接。画布编辑可以独立使用，无需等待服务连接。</p>
-      </section>
+      <h1 id="page-title">服务检查</h1>
 
       <section className="status-panel" aria-labelledby="service-title">
         <div className="panel-heading">
@@ -90,25 +87,23 @@ export function DevelopmentStatus() {
           </span>
         </div>
 
-        {health.status === 'error' && <p className="error-detail">{health.message}</p>}
-        <p className="help-text">仅确认 API 服务可达，数据库和 Redis 的就绪情况由后端单独检查。</p>
-        <button type="button" onClick={retryHealth} disabled={health.status === 'pending'}>
+        {health.status === 'error' && (
+          <p className="error-detail" role="alert">
+            {health.message}
+          </p>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={retryHealth}
+          disabled={health.status === 'pending'}
+        >
           {health.status === 'pending'
             ? '检查中…'
             : health.status === 'error'
               ? '重试连接'
               : '重新检查'}
-        </button>
-      </section>
-
-      <section className="next-steps" aria-labelledby="next-title">
-        <h2 id="next-title">接下来构建</h2>
-        <p>二维画布已接入统一命令；以下能力仍在后续计划中。</p>
-        <ul>
-          <li>场景保存、授权与发布快照</li>
-          <li>AI 对话搭建与局部修改</li>
-          <li>独立主题包、三维场景与动画</li>
-        </ul>
+        </Button>
       </section>
     </main>
   );
