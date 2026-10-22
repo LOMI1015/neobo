@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   consoleColorsEnabled,
-  createConsoleLogger,
   reportListening,
   reportStartupArt,
   reportStartupFailure,
 } from '../src/console-display.js';
+import { createRuntimeLogging } from '../src/logging.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -30,40 +30,44 @@ describe('开发终端显示', () => {
     expect(consoleColorsEnabled({ NEOBO_DEV_COLORS: '1', ...env }, true)).toBe(false);
   });
 
-  it('生产启动失败输出安全的单行 JSON', () => {
+  it('生产不输出艺术字，日志不可用时仅输出固定提示', () => {
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     reportStartupArt({ NODE_ENV: 'production' });
-    reportStartupFailure(createConsoleLogger({ NODE_ENV: 'production' }, true));
-
-    const output = write.mock.calls.map(([value]) => String(value)).join('');
-    expect(output.trim().split('\n')).toHaveLength(1);
-    const parsed: unknown = JSON.parse(output);
-    expect(parsed).toMatchObject({
-      level: 'error',
-      context: 'API',
-    });
-    expect(parsed).toHaveProperty('message', expect.stringContaining('API 启动失败'));
-    expect(output).not.toContain('\u001b[');
-    expect(output).not.toContain('stack');
+    reportStartupFailure();
+    expect(stderr).toHaveBeenCalledWith('API 启动失败，请检查环境配置和端口占用。\n');
     expect(stdout).not.toHaveBeenCalled();
   });
 
-  it('监听摘要使用运行时地址，区分访问 URL 与通配绑定地址', () => {
-    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    reportListening(
-      'http://[::1]:43210',
-      '::',
-      createConsoleLogger({ NODE_ENV: 'production' }, true),
-    );
+  it('禁色艺术字保留纯文本，启用颜色不改变图案', () => {
+    const plain = { write: vi.fn<(chunk: string) => boolean>(() => true), isTTY: true };
+    const colored = { write: vi.fn<(chunk: string) => boolean>(() => true), isTTY: true };
+    reportStartupArt({ NO_COLOR: '' }, plain);
+    reportStartupArt({}, colored);
+    expect(plain.write).toHaveBeenCalledOnce();
+    expect(plain.write.mock.calls[0]?.[0]).not.toContain('\u001b[');
+    expect(colored.write).toHaveBeenCalledOnce();
+    expect(colored.write.mock.calls[0]?.[0]).toContain('\u001b[');
+  });
 
-    const output = write.mock.calls.map(([value]) => String(value)).join('');
-    const parsed: unknown = JSON.parse(output);
-    expect(parsed).toHaveProperty(
-      'message',
-      expect.stringContaining('http://[::1]:43210/api/health'),
-    );
-    expect(output).toContain('绑定地址 ::');
-    expect(output).not.toContain('已就绪');
+  it('监听摘要使用实际端口和绑定地址，不把运行时URL当任意日志正文', async () => {
+    const records: string[] = [];
+    const logging = createRuntimeLogging({
+      environment: 'production',
+      destination: { write: (record) => records.push(record) },
+    });
+    try {
+      reportListening('http://[::1]:43210', '::', logging);
+      expect(records).toHaveLength(1);
+      expect(JSON.parse(records[0] ?? '')).toMatchObject({
+        event: 'server.listening',
+        host: '::',
+        port: 43210,
+      });
+      expect(records.join('')).not.toContain('\u001b[');
+      expect(records.join('')).not.toContain('已就绪');
+    } finally {
+      await logging.close();
+    }
   });
 });

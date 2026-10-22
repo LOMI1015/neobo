@@ -1,5 +1,5 @@
 import { styleText } from 'node:util';
-import { ConsoleLogger } from '@nestjs/common';
+import type { RuntimeLogging } from './logging.js';
 
 const startupArt = String.raw`
                     _
@@ -25,26 +25,12 @@ export function consoleColorsEnabled(env: NodeJS.ProcessEnv, isTTY: boolean): bo
   return isTTY || env.NEOBO_DEV_COLORS === '1';
 }
 
-export function createConsoleLogger(
-  env: NodeJS.ProcessEnv = process.env,
-  isTTY = process.stdout.isTTY === true,
-): ConsoleLogger {
-  return new ConsoleLogger('API', {
-    prefix: 'neobo',
-    timestamp: true,
-    colors: consoleColorsEnabled(env, isTTY),
-    json: env.NODE_ENV === 'production',
-    logLevels: ['log', 'warn', 'error'],
+export function reportListening(url: string, bindHost: string, logging: RuntimeLogging): void {
+  const address = new URL(url);
+  logging.write('info', 'server.listening', {
+    host: bindHost,
+    port: Number(address.port || (address.protocol === 'https:' ? 443 : 80)),
   });
-}
-
-export function reportListening(
-  url: string,
-  bindHost: string,
-  logger = createConsoleLogger(),
-): void {
-  const healthUrl = new URL('/api/health', url).href;
-  logger.log(`API 已监听 ${url} · 健康检查 ${healthUrl} · 绑定地址 ${bindHost}`);
 }
 
 export function reportStartupArt(
@@ -63,6 +49,7 @@ export function reportStartupArt(
   output.write(`${art}\n`);
 }
 
-export function reportStartupFailure(logger = createConsoleLogger()): void {
-  logger.error('API 启动失败，请检查环境配置和端口占用。');
+export function reportStartupFailure(): void {
+  // 日志初始化失败时只保留固定标准错误提示，绝不回退输出异常对象。
+  process.stderr.write('API 启动失败，请检查环境配置和端口占用。\n');
 }
