@@ -307,13 +307,13 @@ describe('请求日志真实链路验收', () => {
     const fixture = await start((server, runtime) => {
       server.get<{ Params: { id: string } }>('/test/context/:id', async (request) => {
         const before = runtime.requestId();
-        runtime.nest.log(secrets.message, secrets.header);
+        runtime.nest.warn(secrets.message, secrets.header);
         entered += 1;
         if (entered === 2) releaseRequests?.();
         await bothEntered;
         await new Promise<void>((resolve) => setImmediate(resolve));
         observed.set(request.params.id, { before, after: runtime.requestId(), id: request.id });
-        request.log.info(
+        request.log.warn(
           { req: request, body: secrets.body, err: new Error(secrets.error) },
           secrets.message,
         );
@@ -340,7 +340,7 @@ describe('请求日志真实链路验收', () => {
       expect(records.filter((record) => record.event === 'http.completed')).toHaveLength(1);
     }
     expect(fixture.logging.requestId()).toBeUndefined();
-    fixture.logging.nest.log(secrets.message);
+    fixture.logging.nest.warn(secrets.message);
     const outside = fixture.output.records().at(-1);
     expect(outside).toMatchObject({ event: 'framework.log' });
     expect(outside).not.toHaveProperty('requestId');
@@ -489,7 +489,7 @@ describe('请求日志真实链路验收', () => {
     app = undefined;
     expect(closed).toHaveBeenCalledOnce();
     await expect(fixture.app.inject({ method: 'GET', url: '/api/health' })).rejects.toThrow();
-    fixture.logging.nest.log(secrets.message);
+    fixture.logging.nest.warn(secrets.message);
     await fixture.logging.close();
     logging = undefined;
     expect(fixture.output.records().at(-1)).toMatchObject({ event: 'framework.log' });

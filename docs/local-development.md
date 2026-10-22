@@ -41,6 +41,14 @@ NO_COLOR=1 pnpm dev
 
 根开发入口通过现有 concurrently 管理进程、固定 `NODE_ENV=development` 并传递颜色策略；内部标志无需手动配置。生产使用构建后的 API `start` 入口并设置 `NODE_ENV=production`，NestJS 和 Fastify 使用同一个 Pino 实例，生产输出逐行无色 JSON，不加载开发格式化器或输出艺术字。请求摘要与错误详情只允许固定事件和受控字段；框架原始消息、异常正文、堆栈不直接输出。请求日志基础已落地，持久审计等后续能力按 [日志设计](logging.md) 实施。
 
+默认日志阈值为 `info`，常规 NestJS 初始化、路由注册及 Fastify 监听内部事件归入 `debug`，不会重复打印“框架运行事件”。排查初始化时在启动命令前显式传入进程环境变量：
+
+```bash
+LOG_LEVEL=debug pnpm dev
+```
+
+调试日志用固定 `frameworkSource` 区分已知框架来源，仍不输出原始消息、凭据或异常堆栈；警告和错误保持原级别。`LOG_LEVEL` 允许 `trace`、`debug`、`info`、`warn`、`error`、`fatal`，不从根 `.env` 读取，修改后需重新启动。配置无效时启动失败，不回显原值；完整规则见 [日志设计](logging.md#开发终端显示)。
+
 ## 服务与端口
 
 | 服务       | 本机地址                | 用途                        |
