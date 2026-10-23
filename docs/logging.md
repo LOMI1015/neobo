@@ -11,7 +11,7 @@
 | 运行日志 | 定位接口、查询、模型与后台任务的故障和耗时     | Pino 输出逐行 JSON 到标准输出，由容器或部署环境收集、轮转 |
 | 操作审计 | 回答谁在什么权限下对哪个对象做了什么、是否成功 | PostgreSQL 独立追加表，单独授权、查询和清理               |
 
-当前直接声明并复用 Fastify 已使用的 Pino 10.4.0，NestJS 通过 `LoggerService` 对接同一日志实例；业务只调用统一入口。复用现有库的序列化、脱敏和输出能力，不自建日志引擎。桥接包若有必要，实施前核实其维护状态和当前 NestJS / Fastify 版本兼容性；代码直接使用的库必须声明直接依赖，不依赖传递安装。基础能力参考 [Fastify 日志文档](https://fastify.dev/docs/latest/Reference/Logging/) 与 [NestJS 日志接口](https://docs.nestjs.com/techniques/logger)。
+当前直接声明并复用 Fastify 已使用的 Pino 10.4.0，NestJS 通过 `LoggerService` 对接同一日志实例；业务只调用统一入口。复用现有库的序列化、脱敏和输出能力，不自建日志引擎；代码直接使用的库必须声明直接依赖，不依赖传递安装。基础能力参考 [Fastify 日志文档](https://fastify.dev/docs/latest/Reference/Logging/) 与 [NestJS 日志接口](https://docs.nestjs.com/techniques/logger)。
 
 起步不强制安装集中日志平台。后续需要跨主机检索时，在输出侧接入已有采集工具；需要完整调用链时采用 OpenTelemetry，不另造追踪协议。日志、耗时统计和审计各司其职，不靠打印每次渲染或每个 token 计算性能指标。
 
@@ -39,15 +39,17 @@
 
 `info` 记录请求或任务的完成摘要及重要状态变化；`warn` 记录可恢复失败和重试；`error` 记录请求或任务最终失败；`fatal` 记录进程无法继续运行。`debug` / `trace` 用于有范围、有时限的排查，仍执行脱敏；生产默认 `info`。预期的参数错误不一律打印异常堆栈，权限拒绝记录受控安全事件。健康检查成功可降噪，失败不能因此消失。
 
+上表包含完整设计；当前 API 已实现服务元数据、框架来源、请求标识、HTTP 摘要与受控错误字段。身份、项目、队列任务、模型和追踪字段随对应模块接入，不能将字段约定视为这些模块已经实现。
+
 单条记录的字段、字符串长度、嵌套深度和总字节数必须有上限；不把错误码、消息、字段名当成任意外部输入。具体限制在实现时用测试验证，上线容量结合负载确定。
 
 当前实现只允许固定事件、错误码与平面标量字段，请求标识最多 64 字符、路由模板最多 256 字符、绑定地址最多 253 字符；未知字段、嵌套对象和原始框架消息均丢弃。`frameworkSource` 仅接受 `NestFactory`、`InstanceLoader`、`RoutesResolver`、`RouterExplorer`、`NestApplication`、`ExceptionsHandler`、`ExceptionHandler` 和 `unknown`；NestJS 未知 context 使用 `unknown`，无法确定来源的原生 Pino 日志不伪造模块名。调试输出也不记录原始消息、异常、堆栈、路由参数或任意 context。边界样例验证完整 JSON 行小于 2 KiB；子日志不能追加 bindings 或覆盖序列化、脱敏配置。HTTP 实际请求标识仍一律由服务端生成 UUID。
 
 ## 3. 一次操作如何串起来
 
-HTTP 入口生成服务端 `requestId`，通过响应头 `X-Request-Id` 返回；不能直接信任浏览器提供的同名头。Fastify 的外部请求标识头不自带校验，接入时须显式配置。请求上下文使用 Node.js `AsyncLocalStorage`，同一请求的服务、查询和模型事件复用该标识，并通过并发测试证明不串号。[请求标识说明](https://fastify.dev/docs/latest/Reference/Server/#requestidheader)、[AsyncLocalStorage](https://nodejs.org/docs/latest-v24.x/api/async_context.html#class-asynclocalstorage)。
+当前 HTTP 入口生成服务端 `requestId`，通过响应头 `X-Request-Id` 返回，忽略客户端提供的同名头。请求上下文使用 Node.js `AsyncLocalStorage`，已有并发测试验证隔离；后续请求内查询和模型事件复用该上下文，不另建关联协议。[请求标识说明](https://fastify.dev/docs/latest/Reference/Server/#requestidheader)、[AsyncLocalStorage](https://nodejs.org/docs/latest-v24.x/api/async_context.html#class-asynclocalstorage)。
 
-进入 BullMQ 任务时只传必要关联标识；Worker 每次执行单独建立上下文，记录 `jobId`、尝试次数和原始关联。进程内上下文不会自动跨队列传递；调度任务没有原始请求时不伪造。权限必须重新核验，日志标识和追踪信息不是授权凭据。未来接入 OpenTelemetry 时用其传播接口，外部上下文先校验且不能承载业务密钥，也不默认向外部模型传递内部上下文。[上下文传播说明](https://opentelemetry.io/docs/languages/js/propagation/)。
+后续接入 BullMQ 时只传必要关联标识；Worker 每次执行单独建立上下文，记录 `jobId`、尝试次数和原始关联。进程内上下文不会自动跨队列传递；调度任务没有原始请求时不伪造。权限必须重新核验，日志标识和追踪信息不是授权凭据。未来接入 OpenTelemetry 时用其传播接口，外部上下文先校验且不能承载业务密钥，也不默认向外部模型传递内部上下文。[上下文传播说明](https://opentelemetry.io/docs/languages/js/propagation/)。
 
 ## 4. 记录位置与错误处理
 
@@ -64,9 +66,9 @@ HTTP 入口生成服务端 `requestId`，通过响应头 `X-Request-Id` 返回�
 
 先按允许字段构造记录，再用 Pino `redact` 防御已知敏感字段。依据其路径处理机制，不能认为它能扫描任意文本：把连接串拼进 `msg` 或 `err.stack` 仍可能泄漏；错误消息、嵌套原因和第三方附加字段需要先转换成受控信息。脱敏策略由服务端固定，子日志实例和外部配置不能关闭它；序列化失败也不得回退输出原对象。[Pino 脱敏机制](https://github.com/pinojs/pino/blob/main/docs/redaction.md)、[错误序列化字段](https://github.com/pinojs/pino-std-serializers#exportserrerror)。
 
-AI 事件只记录供应商 / 模型标识、阶段、耗时、工具名、结果状态及供应商实际返回的用量。费用是估算时明确标记，缺少用量或价格时记为未知，不能捏造。对话历史若成为产品功能，须单独设计权限、存储和删除，不借日志实现。
+后续 AI 事件只记录供应商 / 模型标识、阶段、耗时、工具名、结果状态及供应商实际返回的用量。费用是估算时明确标记，缺少用量或价格时记为未知，不能捏造。对话历史若成为产品功能，须单独设计权限、存储和删除，不借日志实现。
 
-浏览器只上报经允许的错误类型、组件 / 构建版本和必要关联信息；不上传 DOM、业务数据、完整页面 URL 或编辑内容。错误上报接口限制大小、频率和重复次数；上报失败不能中断画布，不在每帧回调输出日志。产品数据不默认发送到第三方服务。
+当前没有浏览器错误上报接口。后续接入时只上报经允许的错误类型、组件 / 构建版本和必要关联信息，不上传 DOM、业务数据、完整页面 URL 或编辑内容。接口须限制大小、频率和重复次数；上报失败不能中断画布，不在每帧回调输出日志。产品数据不默认发送到第三方服务。
 
 ## 6. 操作审计
 
@@ -87,7 +89,7 @@ AI 事件只记录供应商 / 模型标识、阶段、耗时、工具名、结�
 
 当前默认输出使用 Pino 原生异步 destination，缓冲上限 64 KiB，满时丢弃运行日志并计数，写入故障仅输出一次固定标准错误信号，不递归记录或回退到原对象。开发格式化同步复用 `prettyFactory`，不创建额外输出队列。默认关闭时限 1 秒，结束后释放自有输出资源；传入的测试输出流由调用者拥有，其容量由调用者管理，不纳入默认缓冲上限。此处的缓冲与关闭上限是实现保护，不代表已完成上线容量规划、轮转、告警或性能验收。
 
-异步 transport 能把输出处理移出主线程，但仍需处理背压和关闭；系统故障可能丢失尾部缓冲。因此它不能替代事务审计，也不能直接保证不阻塞或不丢日志。实施前验证所选输出方式在慢写和磁盘满时的行为，不自写 transport 框架。[Pino transport](https://github.com/pinojs/pino/blob/main/docs/transports.md#writing-a-transport)、[异步写入限制](https://github.com/pinojs/pino/blob/main/docs/asynchronous.md#caveats)。
+后续若使用异步 transport 将输出处理移出主线程，仍须处理背压和关闭；系统故障可能丢失尾部缓冲。因此它不能替代事务审计，也不能直接保证不阻塞或不丢日志。切换前验证慢写和磁盘满行为，不自写 transport 框架。[Pino transport](https://github.com/pinojs/pino/blob/main/docs/transports.md#writing-a-transport)、[异步写入限制](https://github.com/pinojs/pino/blob/main/docs/asynchronous.md#caveats)。
 
 **上线前必须确认并落实**：运行日志与审计各自的保留时间、容量 / 磁盘上限、采样范围、清理和备份规则、查询权限、告警去向，以及是否有集中存储和防篡改要求。配置须启动校验；不能用无限保留、忽略写入失败或改成空日志绕过验收。当前没有这些配置项、告警任务或部署承诺。
 

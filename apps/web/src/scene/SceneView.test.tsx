@@ -1,6 +1,14 @@
-import { createEmptyScene, type SceneDocument, type SceneNode } from '@neobo/scene';
+import {
+  createEmptyScene,
+  type RectangleNode,
+  type SceneDocument,
+  type SceneNode,
+} from '@neobo/scene';
 import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { StrictMode, useEffect } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { createSceneComponentRegistry } from './component-registry';
+import { sceneComponents } from './components';
 import { SceneView } from './SceneView';
 
 const transform = { x: 10, y: 20, width: 120, height: 60, rotation: 0 };
@@ -19,6 +27,24 @@ function renderScene(document: SceneDocument) {
       <SceneView document={document} />
     </svg>,
   );
+}
+
+function ResourceRectangle({
+  node,
+  acquire,
+  release,
+}: {
+  readonly node: RectangleNode;
+  readonly acquire: (resource: symbol) => void;
+  readonly release: (resource: symbol) => void;
+}) {
+  useEffect(() => {
+    const resource = Symbol('registered-view');
+    acquire(resource);
+    return () => release(resource);
+  }, [acquire, release]);
+
+  return <ellipse rx={node.transform.width / 2} ry={node.transform.height / 2} />;
 }
 
 describe('只读二维场景绘制结构', () => {
@@ -170,5 +196,108 @@ describe('只读二维场景绘制结构', () => {
       </svg>,
     );
     expect(container.querySelector('svg')?.children).toHaveLength(0);
+  });
+
+  it('公开注册表替代实际矩形绘制，嵌套顺序、旋转与隐藏语义仍由场景掌管', () => {
+    const registry = createSceneComponentRegistry([
+      {
+        ...sceneComponents.resolve('rectangle', 1),
+        render: (node: RectangleNode) => (
+          <circle data-registered-node={node.id} r={node.transform.width / 2} />
+        ),
+      },
+    ]);
+    const document = scene(
+      [
+        rectangle('front'),
+        rectangle('back'),
+        { ...rectangle('hidden'), visible: false },
+        {
+          id: 'group',
+          type: 'group',
+          visible: true,
+          transform: { ...transform, rotation: 90 },
+          children: ['back', 'hidden', 'front'],
+        },
+      ],
+      ['group'],
+    );
+    const { container } = render(
+      <svg>
+        <SceneView document={document} registry={registry} />
+      </svg>,
+    );
+
+    expect(
+      Array.from(container.querySelectorAll('circle'), (element) =>
+        element.getAttribute('data-registered-node'),
+      ),
+    ).toEqual(['back', 'front']);
+    expect(container.querySelector('[data-node-id="group"]')).toHaveAttribute(
+      'transform',
+      'translate(10 20) rotate(90 60 30)',
+    );
+    expect(container.querySelector('[data-node-id="back"]')).toHaveAttribute(
+      'transform',
+      'translate(10 20) rotate(0 60 30)',
+    );
+    expect(container.querySelectorAll('rect')).toHaveLength(1);
+    expect(container.querySelector('rect')).toHaveAttribute('data-group-frame');
+    expect(container.querySelector('[data-node-id="hidden"]')).toBeNull();
+    expect(container.querySelector('clipPath, [clip-path], svg svg')).toBeNull();
+  });
+
+  it('登记绘制返回独立有生命周期的组件，隐藏、卸载与StrictMode对称释放资源', () => {
+    const resources = new Set<symbol>();
+    const acquire = vi.fn((resource: symbol) => {
+      resources.add(resource);
+    });
+    const release = vi.fn((resource: symbol) => {
+      resources.delete(resource);
+    });
+    const registry = createSceneComponentRegistry([
+      {
+        ...sceneComponents.resolve('rectangle', 1),
+        render: (node: RectangleNode) => (
+          <ResourceRectangle node={node} acquire={acquire} release={release} />
+        ),
+      },
+    ]);
+    const document = scene(
+      [
+        { id: 'group', type: 'group', visible: true, transform, children: ['child'] },
+        rectangle('child'),
+      ],
+      ['group'],
+    );
+    const view = (current: SceneDocument) => (
+      <StrictMode>
+        <svg>
+          <SceneView document={current} registry={registry} />
+        </svg>
+      </StrictMode>
+    );
+    const { container, rerender, unmount } = render(view(document));
+
+    expect(container.querySelector('ellipse')).toBeInTheDocument();
+    expect(resources.size).toBe(1);
+    expect(acquire).toHaveBeenCalledTimes(2);
+    expect(release).toHaveBeenCalledTimes(1);
+    rerender(
+      view({
+        ...document,
+        nodes: document.nodes.map((node) =>
+          node.id === 'group' ? { ...node, visible: false } : node,
+        ),
+      }),
+    );
+    expect(container.querySelector('ellipse')).toBeNull();
+    expect(resources.size).toBe(0);
+    expect(release).toHaveBeenCalledTimes(acquire.mock.calls.length);
+    rerender(view(document));
+    expect(resources.size).toBe(1);
+    unmount();
+    expect(resources.size).toBe(0);
+    expect(release).toHaveBeenCalledTimes(acquire.mock.calls.length);
   });
 });

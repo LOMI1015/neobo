@@ -11,6 +11,8 @@ import {
   type SceneNode,
 } from '@neobo/scene';
 import { SceneView } from '../scene/SceneView';
+import type { SceneComponentType } from '../scene/component-registry';
+import { createSceneComponent, sceneComponents } from '../scene/components';
 import { Button } from '../components/ui/button';
 import { EditorActionsMenu, EditorContextMenu, type EditorMenuActions } from './EditorMenus';
 import { LayerList } from './LayerList';
@@ -82,25 +84,9 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
     setError('');
   }
 
-  function add(type: 'text' | 'rectangle') {
+  function add(type: SceneComponentType) {
     const id = nextNodeId(document, type);
-    const width = Math.min(320, document.canvas.width);
-    const height = Math.min(type === 'text' ? 72 : 180, document.canvas.height);
-    const common = {
-      id,
-      visible: true,
-      transform: {
-        x: (document.canvas.width - width) / 2,
-        y: (document.canvas.height - height) / 2,
-        width,
-        height,
-        rotation: 0,
-      },
-    };
-    const node: SceneNode =
-      type === 'text'
-        ? { ...common, type: 'text', componentVersion: 1, text: '文字' }
-        : { ...common, type: 'rectangle', componentVersion: 1 };
+    const node = createSceneComponent(type, { id, canvas: document.canvas });
     if (
       execute(batch([{ type: 'node.add', node, parentId: null, index: document.rootIds.length }]))
     ) {
@@ -226,7 +212,7 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
             disabled={drag.active}
             onClick={() => add('text')}
           >
-            <span aria-hidden="true">T</span> 添加文字
+            <span aria-hidden="true">T</span> 添加{sceneComponents.resolve('text', 1).label}
           </Button>
           <Button
             variant="outline"
@@ -234,7 +220,7 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
             disabled={drag.active}
             onClick={() => add('rectangle')}
           >
-            <span aria-hidden="true">□</span> 添加矩形
+            <span aria-hidden="true">□</span> 添加{sceneComponents.resolve('rectangle', 1).label}
           </Button>
         </div>
         <div className="editor-tool-group">

@@ -64,7 +64,7 @@
 - 它提供可放入项目并定制的组件源码，适合维护统一外观；源码纳入仓库后需自行 review 和维护。[官方介绍](https://ui.shadcn.com/docs)。
 - Tailwind CSS 与 Vite 插件、底层组件依赖固定版本，Vite、TypeScript 和 Vitest 共享路径约定；新增组件需检查全局样式重置、既有选择器和场景绘制是否被意外影响。[Vite 接入](https://ui.shadcn.com/docs/installation/vite)。
 - 语义 CSS 变量集中在 `apps/web/src/styles.css`，公共组件放在 `apps/web/src/components/ui`，不提前创建独立 UI 包。只添加当前需要的组件，右键菜单与可见菜单入口使用同一动作。[主题变量](https://ui.shadcn.com/docs/theming)、[右键菜单](https://ui.shadcn.com/docs/components/radix/context-menu)。
-- 项目采用 MIT 许可证；生成源码的许可保留在 `apps/web/src/components/ui/LICENSE`。按需添加入口和 CSS 维护方式见 [本地开发](local-development.md#前端公共组件)。审查生成 diff 和锁文件，不默认拉入演示页面或说明文案。[官方许可证](https://github.com/shadcn-ui/ui/blob/main/LICENSE.md)。
+- shadcn/ui 采用 MIT 许可证，生成源码的许可保留在 `apps/web/src/components/ui/LICENSE`；本仓库整体许可证仍待维护者确定。按需添加入口和 CSS 维护方式见 [本地开发](local-development.md#前端公共组件)。审查生成 diff 和锁文件，不默认拉入演示页面或说明文案。[官方许可证](https://github.com/shadcn-ui/ui/blob/main/LICENSE.md)。
 
 ## 模块边界
 
@@ -121,6 +121,17 @@
 
 日常 CI 不依赖真实模型费用、生产数据库或外部私有凭据。真实服务测试单独启用并说明所需环境。已有检查通过后，只有新变更或未解决风险才需要重复或扩大验证。
 
+## 文档同步与提交顺序
+
+每次开发或修改（包括缺陷修复、配置和流程调整）均按以下顺序完成交付：
+
+1. 完成实现、代码 review 和必要检查，记录实际结果；检查发现问题时先修复并复验。
+2. 按最终实现及时同步受影响的 README、架构/接口约定、配置/开发说明、路线图和对应迭代记录。删除或替换失效说明、示例、命令和引用，区分已实现、待实现与环境限制，不把计划或预期写成完成证据。
+3. 对更新后的文档执行格式、结构和链接检查，核对文档与代码一致；文档更新若伴随实现调整，先重新运行受影响的检查，再修正文档结果。
+4. 代码与文档均就绪后，核对暂存 diff，再提交、推送并创建或更新 PR。不得先提交 PR，再补本应同步的文档或开发说明。
+
+历史迭代保留当时的交付事实和验证证据，当前状态以 README、路线图、现行规范及最新迭代为入口。旧 ADR 被新决定替代时补充状态及后续链接，不把历史记录改写成最新能力；重复或失效的现行说明应及时清理。
+
 ## Git、评审与交付
 
 - `main` 保持可用；从最新 `main` 创建短期分支，如 `feat/scene-commands`、`fix/query-scope`、`docs/contributing`。不增加长期 `develop` 分支。
@@ -130,4 +141,4 @@
 - 使用 squash merge，保持主线历史清晰。PR 标题按 Conventional Commits 编写，用作合并提交标题。
 - 发布、权限配置及受保护环境遵循 [CI/CD 规则](ci-cd.md)。工作流不自动替维护者决定发布或合并。
 
-每次完成迭代，同步行为相关文档与迭代记录：写明实际完成内容、检查证据、遗留问题和下一步。原有记录保持可追溯，修正记录时注明原因。
+提交前按上方顺序完成文档同步；迭代记录写明实际完成内容、检查证据、遗留问题和下一步。
