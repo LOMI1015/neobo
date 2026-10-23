@@ -1,7 +1,7 @@
-import type { BarChartNode } from '@neobo/scene';
+import type { BarChartNode } from '@neobo/scene/document';
 import { act, render } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import { BarChartView } from './BarChartView';
+import { BarChartView } from '../src/BarChartView.js';
 
 const loading = vi.hoisted(() => {
   let release = () => {};
@@ -11,7 +11,7 @@ const loading = vi.hoisted(() => {
   return { ready, release, mounted: vi.fn() };
 });
 
-vi.mock('./BarChartSurface', async () => {
+vi.mock('../src/BarChartSurface.js', async () => {
   await loading.ready;
   return {
     default: () => {

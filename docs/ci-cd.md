@@ -1,6 +1,6 @@
 # CI/CD 规则
 
-状态：2026-10-23。**CI 已实际运行通过；CD 为确定的实施规则，当前没有发布或部署工作流。** Web、API 和共享场景包的静态检查、类型检查、测试和构建均接入统一检查；已合并的 PR #11 的 [远端 `quality` 检查](https://github.com/LOMI1015/neobo/actions/runs/39837981401) 成功。每个后续提交仍须验证自身检查结果，历史成功不代表新代码已经通过。
+状态：2026-10-23。**CI 已实际运行通过；CD 为确定的实施规则，当前没有发布或部署工作流。** Web、API、共享场景与播放器包的静态检查、类型检查、测试和构建均接入统一检查；已合并的 PR #11 的 [远端 `quality` 检查](https://github.com/LOMI1015/neobo/actions/runs/39837981401) 成功。每个后续提交仍须验证自身检查结果，历史成功不代表新代码已经通过。
 
 CI 是每次提交的自动检查；CD 是将通过检查的版本制作成制品、发布并部署。检查通过不等于获得合并或上线授权。
 
@@ -74,7 +74,7 @@ PR 事件运行 `pnpm check:pr`，从 `GITHUB_EVENT_PATH` 读取标题和正文�
 
 评审还需核对 [开发规范](development.md) 中的成熟方案复用、事实依据、简洁注释和用户确认记录。日志改动按 [日志设计](logging.md#8-落地顺序与验收) 补充脱敏、关联、审计与资源验证；文档设计完成不等于这些运行能力已实现，静态检查也不能替代语义评审。
 
-当前使用 TypeScript 6.0.3、ESLint 10、typescript-eslint 和 Vitest 5，具体精确版本以根清单与锁文件为准。TypeScript 保持在 typescript-eslint 支持范围内，升级时先检查兼容性。共享严格配置见 [tsconfig.base.json](../tsconfig.base.json) 和 [eslint.config.mjs](../eslint.config.mjs)。前端使用 Testing Library + jsdom 验证组件交互，Playwright 1.64.1 的 Chromium 验证画布真实坐标、捕获、取消和布局；后端使用真实 Fastify 注入验证请求链路。Vitest 只收集 Web 的 `src` 测试，浏览器测试单独位于 `e2e`，两者均受类型和静态检查覆盖。
+当前使用 TypeScript 6.0.3、ESLint 10、typescript-eslint 和 Vitest 5，具体精确版本以根清单与锁文件为准。TypeScript 保持在 typescript-eslint 支持范围内，升级时先检查兼容性。共享严格配置见 [tsconfig.base.json](../tsconfig.base.json) 和 [eslint.config.mjs](../eslint.config.mjs)。前端使用 Testing Library + jsdom 验证组件交互，Playwright 1.64.1 的 Chromium 验证画布真实坐标、捕获、取消和布局；后端使用真实 Fastify 注入验证请求链路。Vitest 在 Web 收集 `src` 测试、在 Player 收集 `test` 测试（含独立消费者的内存生产构建），浏览器测试单独位于 `e2e`，两者均受类型和静态检查覆盖。
 
 日常检查使用供应商模拟、固定数据和隔离测试服务。权限、缓存、迁移、Fastify 请求链路及场景命令按 [开发规范](development.md) 增加集成验证。数据库集成测试使用临时数据库，测试完成后清理。
 

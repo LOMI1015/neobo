@@ -1,4 +1,4 @@
-import type { BarChartNode } from '@neobo/scene';
+import type { BarChartNode } from '@neobo/scene/document';
 
 export function sameBarChartData(
   previous: BarChartNode['data'],

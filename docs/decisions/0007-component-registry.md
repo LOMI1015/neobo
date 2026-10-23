@@ -1,11 +1,11 @@
 # ADR 0007：现有原子组件的 Web 注册入口
 
-- 状态：已接受（实施及验证见迭代记录）
+- 状态：已接受；Web 存放位置与工厂边界由 [ADR 0009](0009-readonly-player.md) 调整，本文保留最初决策
 - 日期：2026-10-23
 - 范围：文字/矩形的元数据、默认创建与只读绘制
-- 关联：[ADR 0003](0003-scene-contract.md)、[ADR 0005](0005-canvas-editor.md)、[模块说明](../../apps/web/src/scene/README.md)
+- 关联：[ADR 0003](0003-scene-contract.md)、[ADR 0005](0005-canvas-editor.md)、[模块说明](../../packages/player/README.md)
 
-后续扩展：[ADR 0008](0008-static-bar-chart.md) 增加已确认的静态柱状图及严格数据契约；本文保留最初文字/矩形注册入口的决策范围。
+后续扩展：[ADR 0008](0008-static-bar-chart.md) 增加已确认的静态柱状图及严格数据契约；本文保留最初文字/矩形注册入口的决策范围。[ADR 0009](0009-readonly-player.md) 将注册与绘制迁入播放器包，节点工厂留在编辑器，以下为当时的位置。
 
 ## 背景
 

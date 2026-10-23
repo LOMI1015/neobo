@@ -1,9 +1,9 @@
-import type { BarChartNode } from '@neobo/scene';
+import type { BarChartNode } from '@neobo/scene/document';
 import { render, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import { BarChartView } from './BarChartView';
+import { BarChartView } from '../src/BarChartView.js';
 
-vi.mock('./BarChartSurface', () => {
+vi.mock('../src/BarChartSurface.js', () => {
   throw new Error('synthetic-module-secret');
 });
 

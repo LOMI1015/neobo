@@ -1,8 +1,8 @@
-import type { BarChartNode } from '@neobo/scene';
+import type { BarChartNode } from '@neobo/scene/document';
 import { Component, lazy, Suspense } from 'react';
-import { sameBarChartData } from './bar-chart-data';
+import { sameBarChartData } from './bar-chart-data.js';
 
-const ChartSurface = lazy(() => import('./BarChartSurface'));
+const ChartSurface = lazy(() => import('./BarChartSurface.js'));
 
 interface BarChartProps {
   readonly node: BarChartNode;

@@ -113,6 +113,59 @@
   font-size: var(--text-xs);
 }
 
+.application-shell--preview {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.application-shell--preview > .application-header {
+  flex-shrink: 0;
+}
+
+.scene-preview {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--canvas-surround);
+}
+
+.scene-preview-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--spacing) * 4);
+  padding: calc(var(--spacing) * 3) calc(var(--spacing) * 6);
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.scene-preview-toolbar h1 {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.scene-preview-stage {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: calc(var(--spacing) * 6);
+  container-type: size;
+}
+
+.scene-preview-canvas {
+  flex-shrink: 0;
+  min-width: 0;
+  outline: 1px solid var(--border);
+  background: var(--canvas-surface);
+}
+
 .development-page {
   width: min(100% - var(--spacing) * 12, 800px);
   margin: 0 auto;
@@ -193,6 +246,14 @@
 
   .application-brand .environment-label {
     display: none;
+  }
+
+  .scene-preview-toolbar {
+    padding-inline: calc(var(--spacing) * 4);
+  }
+
+  .scene-preview-stage {
+    padding: calc(var(--spacing) * 4);
   }
 
   .development-page {

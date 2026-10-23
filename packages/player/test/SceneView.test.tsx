@@ -3,13 +3,13 @@ import {
   type RectangleNode,
   type SceneDocument,
   type SceneNode,
-} from '@neobo/scene';
+} from '@neobo/scene/document';
 import { render } from '@testing-library/react';
 import { StrictMode, useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { createSceneComponentRegistry } from './component-registry';
-import { sceneComponents } from './components';
-import { SceneView } from './SceneView';
+import { createSceneComponentRegistry } from '../src/component-registry.js';
+import { sceneComponents } from '../src/components.js';
+import { SceneView } from '../src/SceneView.js';
 
 const transform = { x: 10, y: 20, width: 120, height: 60, rotation: 0 };
 

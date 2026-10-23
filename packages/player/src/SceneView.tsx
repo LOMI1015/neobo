@@ -1,7 +1,7 @@
-import type { SceneDocument, SceneNode } from '@neobo/scene';
+import type { SceneDocument, SceneNode } from '@neobo/scene/document';
 import type { ReactNode } from 'react';
-import type { SceneComponentRegistry } from './component-registry';
-import { renderSceneComponent, sceneComponents } from './components';
+import type { SceneComponentRegistry } from './component-registry.js';
+import { renderSceneComponent, sceneComponents } from './components.js';
 
 function NodeView({
   id,
@@ -49,13 +49,12 @@ function NodeView({
   );
 }
 
-export function SceneView({
-  document,
-  registry = sceneComponents,
-}: {
+export interface SceneViewProps {
   readonly document: SceneDocument;
   readonly registry?: SceneComponentRegistry;
-}): ReactNode {
+}
+
+export function SceneView({ document, registry = sceneComponents }: SceneViewProps): ReactNode {
   const nodes = new Map(document.nodes.map((node) => [node.id, node]));
 
   return (
