@@ -5,6 +5,8 @@ export {
   validateSceneDocument,
 } from './document.js';
 export type {
+  BarChartDatum,
+  BarChartNode,
   GroupNode,
   RectangleNode,
   SceneDocument,

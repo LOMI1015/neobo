@@ -5,6 +5,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { nodeTitle } from './selection';
+import { ChartDataFields } from './ChartDataFields';
+import { chartDataEqual, createChartDataDraft, parseChartDataDraft } from './chart-data';
 
 export type NodeChanges = Extract<SceneOperation, { type: 'node.update' }>['changes'];
 
@@ -33,6 +35,9 @@ export function PropertiesPanel({ node, disabled, onApply }: PropertiesPanelProp
   }));
   const [text, setText] = useState(node.type === 'text' ? node.text : '');
   const [visible, setVisible] = useState(node.visible);
+  const [dataRows, setDataRows] = useState(() =>
+    createChartDataDraft(node.type === 'bar-chart' ? node.data : []),
+  );
   const [error, setError] = useState('');
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -56,11 +61,21 @@ export function PropertiesPanel({ node, disabled, onApply }: PropertiesPanelProp
     }
     const changed = transformFields.some(([field]) => transform[field] !== node.transform[field]);
     const textChanged = node.type === 'text' && text !== node.text;
+    const dataResult =
+      node.type === 'bar-chart' ? parseChartDataDraft(dataRows, node.id) : undefined;
+    if (dataResult && !dataResult.success) {
+      setError(dataResult.message);
+      return;
+    }
+    const data = dataResult?.data;
+    const dataChanged =
+      node.type === 'bar-chart' && data !== undefined && !chartDataEqual(data, node.data);
     setError('');
-    if (!changed && !textChanged && visible === node.visible) return;
+    if (!changed && !textChanged && !dataChanged && visible === node.visible) return;
     onApply({
       ...(changed ? { transform } : {}),
       ...(textChanged ? { text } : {}),
+      ...(dataChanged && data ? { data } : {}),
       ...(visible !== node.visible ? { visible } : {}),
     });
   }
@@ -96,6 +111,9 @@ export function PropertiesPanel({ node, disabled, onApply }: PropertiesPanelProp
             <span>文字内容</span>
             <Textarea value={text} onChange={(event) => setText(event.target.value)} rows={4} />
           </label>
+        )}
+        {node.type === 'bar-chart' && (
+          <ChartDataFields rows={dataRows} disabled={disabled} onChange={setDataRows} />
         )}
         <div className="editor-checkbox">
           <Checkbox

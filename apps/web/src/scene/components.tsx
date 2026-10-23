@@ -1,5 +1,6 @@
 import { SCENE_SCHEMA_VERSION, validateSceneDocument, type SceneDocument } from '@neobo/scene';
 import type { CSSProperties, ReactNode } from 'react';
+import { BarChartView } from './BarChartView';
 import {
   createSceneComponentRegistry,
   type SceneAtomicNode,
@@ -50,6 +51,14 @@ export const sceneComponents = createSceneComponentRegistry([
       />
     ),
   },
+  {
+    type: 'bar-chart',
+    componentVersion: 1,
+    label: '柱状图',
+    defaultSize: { width: 480, height: 320 },
+    defaultData: [],
+    render: (node) => <BarChartView node={node} />,
+  },
 ]);
 
 export function createSceneComponent(
@@ -81,7 +90,9 @@ export function createSceneComponent(
     nodes: [
       description.type === 'text'
         ? { ...common, type: description.type, text: description.defaultText }
-        : { ...common, type: description.type },
+        : description.type === 'bar-chart'
+          ? { ...common, type: description.type, data: description.defaultData }
+          : { ...common, type: description.type },
     ],
   });
   if (!result.success) throw new Error('场景组件初始数据无效。');
@@ -95,7 +106,12 @@ export function renderSceneComponent(
   registry: SceneComponentRegistry = sceneComponents,
 ): ReactNode {
   // 分支保留描述与节点的类型关联，不用断言调用注册的绘制函数。
-  return node.type === 'text'
-    ? registry.resolve(node.type, node.componentVersion).render(node)
-    : registry.resolve(node.type, node.componentVersion).render(node);
+  switch (node.type) {
+    case 'text':
+      return registry.resolve(node.type, node.componentVersion).render(node);
+    case 'rectangle':
+      return registry.resolve(node.type, node.componentVersion).render(node);
+    case 'bar-chart':
+      return registry.resolve(node.type, node.componentVersion).render(node);
+  }
 }

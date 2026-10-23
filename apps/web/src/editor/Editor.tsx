@@ -222,6 +222,14 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
           >
             <span aria-hidden="true">□</span> 添加{sceneComponents.resolve('rectangle', 1).label}
           </Button>
+          <Button
+            variant="outline"
+            type="button"
+            disabled={drag.active}
+            onClick={() => add('bar-chart')}
+          >
+            <span aria-hidden="true">▥</span> 添加{sceneComponents.resolve('bar-chart', 1).label}
+          </Button>
         </div>
         <div className="editor-tool-group">
           <Button

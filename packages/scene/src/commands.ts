@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import {
+  barChartDataSchema,
   identifierSchema,
   nodeSchema,
   SCENE_LIMITS,
@@ -21,6 +22,7 @@ const changesSchema = z
     transform: transformChangesSchema.optional(),
     visible: z.boolean().optional(),
     text: z.string().max(SCENE_LIMITS.maxTextLength).optional(),
+    data: barChartDataSchema.optional(),
   })
   .refine(hasDefinedChanges);
 const destinationShape = {
@@ -43,21 +45,37 @@ const revisionRequestShape = {
 };
 const revisionRequestSchema = z.strictObject(revisionRequestShape);
 
+function withinChartDataLimit(value: unknown): boolean {
+  return (
+    typeof value !== 'object' ||
+    value === null ||
+    !('data' in value) ||
+    !Array.isArray(value.data) ||
+    value.data.length <= SCENE_LIMITS.maxChartDataPoints
+  );
+}
+
 function withinInputLimits(input: unknown): boolean {
   if (typeof input !== 'object' || input === null || !('operations' in input)) return true;
   if (!Array.isArray(input.operations)) return true;
   if (input.operations.length > SCENE_COMMAND_LIMITS.maxOperations) return false;
-  // Zod 数组的尺寸校验仍会解析元素，先挡住过大的新增节点引用数组。
+  // 数组尺寸校验仍会解析元素，先挡住过大的节点引用与图表数据。
   return input.operations.every((operation: unknown) => {
-    if (typeof operation !== 'object' || operation === null || !('node' in operation)) return true;
-    const node: unknown = operation.node;
-    return (
-      typeof node !== 'object' ||
-      node === null ||
-      !('children' in node) ||
-      !Array.isArray(node.children) ||
-      node.children.length <= SCENE_LIMITS.maxNodes
-    );
+    if (typeof operation !== 'object' || operation === null) return true;
+    if ('node' in operation) {
+      const node: unknown = operation.node;
+      if (!withinChartDataLimit(node)) return false;
+      if (
+        typeof node === 'object' &&
+        node !== null &&
+        'children' in node &&
+        Array.isArray(node.children) &&
+        node.children.length > SCENE_LIMITS.maxNodes
+      ) {
+        return false;
+      }
+    }
+    return !('changes' in operation) || withinChartDataLimit(operation.changes);
   });
 }
 
@@ -121,9 +139,17 @@ type WorkingDocument = Omit<SceneDocument, 'rootIds' | 'nodes'> & {
 };
 
 function copyNode(node: SceneNode): MutableNode {
-  return node.type === 'group'
-    ? { ...node, transform: { ...node.transform }, children: [...node.children] }
-    : { ...node, transform: { ...node.transform } };
+  if (node.type === 'group') {
+    return { ...node, transform: { ...node.transform }, children: [...node.children] };
+  }
+  if (node.type === 'bar-chart') {
+    return {
+      ...node,
+      transform: { ...node.transform },
+      data: node.data.map((datum) => ({ ...datum })),
+    };
+  }
+  return { ...node, transform: { ...node.transform } };
 }
 
 function targetChildren(document: WorkingDocument, parentId: string | null): string[] | undefined {
@@ -178,9 +204,13 @@ function updateNode(
   const node = document.nodes.find((entry) => entry.id === operation.nodeId);
   if (!node) return 'NODE_NOT_FOUND';
   const { changes } = operation;
-  if (changes.text !== undefined) {
-    if (node.type !== 'text') return 'INVALID_OPERATION';
+  if (changes.text !== undefined && node.type !== 'text') return 'INVALID_OPERATION';
+  if (changes.data !== undefined && node.type !== 'bar-chart') return 'INVALID_OPERATION';
+  if (changes.text !== undefined && node.type === 'text') {
     node.text = changes.text;
+  }
+  if (changes.data !== undefined && node.type === 'bar-chart') {
+    node.data = changes.data.map((datum) => ({ ...datum }));
   }
   if (changes.visible !== undefined) node.visible = changes.visible;
   if (changes.transform) {

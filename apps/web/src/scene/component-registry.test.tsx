@@ -16,6 +16,12 @@ describe('闭合原子组件注册入口', () => {
 
     expect(label('text')).toBe('文字');
     expect(label('rectangle')).toBe('矩形');
+    expect(label('bar-chart')).toBe('柱状图');
+    expect(sceneComponents.resolve('bar-chart', 1).defaultSize).toEqual({
+      width: 480,
+      height: 320,
+    });
+    expect(sceneComponents.resolve('bar-chart', 1).defaultData).toEqual([]);
     expect(sceneComponents.resolve('text', 1).defaultText).toBe('文字');
     expect(sceneComponents.resolve('text', 1).defaultSize).toEqual({ width: 320, height: 72 });
     expect(sceneComponents.resolve('rectangle', 1).defaultSize).toEqual({
@@ -60,6 +66,38 @@ describe('闭合原子组件注册入口', () => {
     expect(() => createSceneComponentRegistry([description, description])).toThrowError(
       /^场景组件重复注册。$/,
     );
+  });
+
+  it('柱状图默认数据保留独立冻结的数组与行快照', () => {
+    const data = [{ category: '原类别', value: -1 }];
+    const registry = createSceneComponentRegistry([
+      { ...sceneComponents.resolve('bar-chart', 1), defaultData: data },
+    ]);
+    const registered = registry.resolve('bar-chart', 1);
+    const row = data[0];
+    if (!row) throw new Error('测试默认数据缺失。');
+    row.category = '修改';
+    row.value = 100;
+    data.pop();
+    expect(registered.defaultData).toEqual([{ category: '原类别', value: -1 }]);
+    expect(Object.isFrozen(registered.defaultData)).toBe(true);
+    expect(Object.isFrozen(registered.defaultData[0])).toBe(true);
+  });
+
+  it.each(
+    [
+      [{ category: ' ', value: 1 }],
+      [{ category: '类别', value: Infinity }],
+      [{ category: '类别', value: SCENE_LIMITS.maxChartValue + 1 }],
+      Array.from({ length: SCENE_LIMITS.maxChartDataPoints + 1 }, () => ({
+        category: '类别',
+        value: 1,
+      })),
+    ].map((defaultData) => ({ defaultData })),
+  )('柱状图无效默认数据不能绕过共享校验', ({ defaultData }) => {
+    expect(() =>
+      createSceneComponentRegistry([{ ...sceneComponents.resolve('bar-chart', 1), defaultData }]),
+    ).toThrowError(/^场景组件声明无效。$/);
   });
 
   it.each([0, 2, NaN, Infinity])('未知版本 %s 固定失败，不回退到已登记版本', (version) => {
@@ -118,7 +156,7 @@ describe('组件创建与绘制消费登记描述', () => {
     });
   });
 
-  it.each(['text', 'rectangle'] satisfies readonly SceneComponentType[])(
+  it.each(['text', 'rectangle', 'bar-chart'] satisfies readonly SceneComponentType[])(
     '小画布中的 %s 保留逐维裁减尺寸和居中行为',
     (type) => {
       const node = createSceneComponent(type, { id: 'small', canvas: { width: 100, height: 30 } });
@@ -165,6 +203,31 @@ describe('组件创建与绘制消费登记描述', () => {
     expect(first).not.toBe(second);
     expect(first.transform).not.toBe(second.transform);
     expect(second.transform).toEqual({ x: 800, y: 450, width: 320, height: 180, rotation: 0 });
+  });
+
+  it('柱状图创建保留空数据和默认尺寸，非空默认行在多次创建间独立', () => {
+    expect(
+      createSceneComponent('bar-chart', { id: 'empty', canvas: { width: 1920, height: 1080 } }),
+    ).toMatchObject({
+      type: 'bar-chart',
+      data: [],
+      transform: { x: 720, y: 380, width: 480, height: 320 },
+    });
+    const registry = createSceneComponentRegistry([
+      { ...sceneComponents.resolve('bar-chart', 1), defaultData: [{ category: '类别', value: 0 }] },
+    ]);
+    const options = { id: 'independent', canvas: { width: 1920, height: 1080 } };
+    const first = createSceneComponent('bar-chart', options, registry);
+    const second = createSceneComponent('bar-chart', options, registry);
+    if (first.type !== 'bar-chart' || second.type !== 'bar-chart')
+      throw new Error('柱状图创建类型错误。');
+    expect(first.data).not.toBe(second.data);
+    expect(first.data[0]).not.toBe(second.data[0]);
+    const row = first.data[0];
+    if (!row) throw new Error('测试默认行缺失。');
+    Reflect.set(row, 'value', 20);
+    expect(second.data).toEqual([{ category: '类别', value: 0 }]);
+    expect(registry.resolve('bar-chart', 1).defaultData).toEqual([{ category: '类别', value: 0 }]);
   });
 
   it('无效标识或画布不能通过工厂生成合法节点，失败不回显输入', () => {
