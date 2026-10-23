@@ -2,7 +2,7 @@
 
 - 日期：2026-10-23（Asia/Shanghai）
 - 状态：已完成（并行开发、统一 review、本地验收与文档检查通过）
-- 关联：[ADR 0007](../decisions/0007-component-registry.md)、[模块开发说明](../../apps/web/src/scene/README.md)
+- 关联：[ADR 0007](../decisions/0007-component-registry.md)、[模块开发说明](../../packages/player/README.md)
 
 ## 目标
 

@@ -14,10 +14,10 @@
     "ui:add": "pnpm dlx shadcn@4.22.1 add"
   },
   "dependencies": {
+    "@neobo/player": "workspace:*",
     "@neobo/scene": "workspace:*",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.0",
-    "echarts": "6.1.0",
     "lucide-react": "1.61.0",
     "radix-ui": "1.8.1",
     "react": "19.3.1",

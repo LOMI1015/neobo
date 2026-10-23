@@ -1,9 +1,9 @@
-import { createEmptyScene, type BarChartNode, type SceneDocument } from '@neobo/scene';
+import { createEmptyScene, type BarChartNode, type SceneDocument } from '@neobo/scene/document';
 import { render, screen } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BarChartView } from './BarChartView';
-import { SceneView } from './SceneView';
+import { BarChartView } from '../src/BarChartView.js';
+import { SceneView } from '../src/SceneView.js';
 
 const charts = vi.hoisted(() => {
   const create = () => ({
@@ -66,7 +66,7 @@ beforeEach(() => {
 describe('柱状图绘制适配与资源生命周期', () => {
   it('只注册柱图、直角坐标与SVG；使用HTML容器及节点逻辑尺寸', async () => {
     vi.resetModules();
-    await import('./BarChartSurface');
+    await import('../src/BarChartSurface.js');
     expect(charts.use).toHaveBeenCalledExactlyOnceWith(['bar-module', 'grid-module', 'svg-module']);
     const { container } = render(view(initial));
     const host = await screen.findByRole('img', { name: '柱状图' });

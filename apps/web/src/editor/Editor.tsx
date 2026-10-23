@@ -10,9 +10,8 @@ import {
   type SceneDocument,
   type SceneNode,
 } from '@neobo/scene';
-import { SceneView } from '../scene/SceneView';
-import type { SceneComponentType } from '../scene/component-registry';
-import { createSceneComponent, sceneComponents } from '../scene/components';
+import { SceneView, sceneComponents, type SceneComponentType } from '@neobo/player';
+import { createSceneComponent } from './create-scene-component';
 import { Button } from '../components/ui/button';
 import { EditorActionsMenu, EditorContextMenu, type EditorMenuActions } from './EditorMenus';
 import { LayerList } from './LayerList';
@@ -24,11 +23,12 @@ import './editor.css';
 export interface EditorProps {
   readonly initialDocument?: SceneDocument;
   readonly active?: boolean;
+  readonly onPreview?: (document: SceneDocument) => void;
 }
 
 type MenuSource = 'canvas' | 'layers' | 'actions';
 
-export function Editor({ initialDocument, active = true }: EditorProps) {
+export function Editor({ initialDocument, active = true, onPreview }: EditorProps) {
   const [history] = useState(() =>
     createSceneHistory(
       initialDocument ?? createEmptyScene({ id: 'local-scene', width: 1920, height: 1080 }),
@@ -274,6 +274,16 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
           >
             重做
           </Button>
+          {onPreview && (
+            <Button
+              variant="outline"
+              type="button"
+              disabled={!active || drag.active}
+              onClick={() => onPreview(history.current())}
+            >
+              预览
+            </Button>
+          )}
           <EditorActionsMenu
             actions={menuActions}
             disabled={!active || drag.active}
@@ -354,7 +364,7 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
                 onPointerCancel={drag.onPointerCancel}
                 onLostPointerCapture={drag.onLostPointerCapture}
               >
-                <SceneView document={displayDocument} />
+                {active && <SceneView document={displayDocument} />}
                 <g className="editor-selection" pointerEvents="none" aria-hidden="true">
                   {selectedIds.map((id) => {
                     const corners = getNodeWorldCorners(displayDocument, id);

@@ -1,5 +1,5 @@
 import type { SceneDocument, SceneNode } from '@neobo/scene';
-import { sceneComponents } from '../scene/components';
+import { sceneComponents } from '@neobo/player';
 
 export function nodeTitle(node: SceneNode): string {
   return node.type === 'group'

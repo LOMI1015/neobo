@@ -255,6 +255,23 @@ describe('画布选择、拖动与资源释放', () => {
     expect(screen.getByRole('button', { name: '撤销' })).toBeDisabled();
   });
 
+  it('拖动期间禁止预览，取消后只发送已提交文档', () => {
+    const onPreview = vi.fn();
+    render(<Editor initialDocument={initialDocument} onPreview={onPreview} />);
+    const fixture = pointerFixture();
+    const preview = screen.getByRole('button', { name: '预览' });
+    fireEvent.pointerDown(fixture.target, fixture.start);
+    fireEvent.pointerMove(fixture.canvas, fixture.end);
+    expect(preview).toBeDisabled();
+    fireEvent.click(preview);
+    expect(onPreview).not.toHaveBeenCalled();
+    fireEvent.pointerCancel(fixture.canvas, { pointerId: 7 });
+    expect(preview).toBeEnabled();
+    fireEvent.click(preview);
+    expect(onPreview).toHaveBeenCalledExactlyOnceWith(initialDocument);
+    expect(screen.getByText('修订 0')).toBeVisible();
+  });
+
   it('CTM不存在或产生非有限坐标时明确拒绝拖动', () => {
     render(<Editor initialDocument={initialDocument} />);
     const fixture = pointerFixture();

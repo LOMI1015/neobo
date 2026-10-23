@@ -1,10 +1,10 @@
-import type { BarChartNode } from '@neobo/scene';
+import type { BarChartNode } from '@neobo/scene/document';
 import { BarChart, type BarSeriesOption } from 'echarts/charts';
 import { GridComponent, type GridComponentOption } from 'echarts/components';
 import { init, use as registerECharts, type ComposeOption, type EChartsType } from 'echarts/core';
 import { SVGRenderer } from 'echarts/renderers';
 import { useEffect, useRef } from 'react';
-import { sameBarChartData } from './bar-chart-data';
+import { sameBarChartData } from './bar-chart-data.js';
 
 registerECharts([BarChart, GridComponent, SVGRenderer]);
 

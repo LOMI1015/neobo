@@ -4,7 +4,7 @@ import {
   type BarChartNode,
   type RectangleNode,
   type TextNode,
-} from '@neobo/scene';
+} from '@neobo/scene/document';
 import type { ReactNode } from 'react';
 
 export type SceneAtomicNode = TextNode | RectangleNode | BarChartNode;

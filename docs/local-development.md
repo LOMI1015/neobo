@@ -1,6 +1,6 @@
 # 本地开发
 
-当前提供 React + Vite 二维画布、Web 原子组件注册、统一的 shadcn/ui 公共控件与设计变量、NestJS + Fastify 后端，以及 PostgreSQL、Redis 开发环境。画布支持文字/矩形/静态单系列柱状图、选择拖动、属性编辑、组合/拆组及撤销/重做；内容仅在当前会话，刷新后不保存。动态数据源、场景存储、AI、场景主题和完整播放器仍未实现。
+当前提供 React + Vite 二维画布、独立只读播放器、组件注册与提交态预览、统一的 shadcn/ui 公共控件与设计变量、NestJS + Fastify 后端，以及 PostgreSQL、Redis 开发环境。画布支持文字/矩形/静态单系列柱状图、选择拖动、属性编辑、组合/拆组及撤销/重做；内容仅在当前会话，刷新后不保存。动态数据源、场景存储、AI、场景主题、发布快照和动画仍未实现。
 
 ## 首次启动
 
@@ -21,27 +21,29 @@ pnpm dev
 
 `.nvmrc` 和 `.node-version` 固定 Node.js 24.22.1，`package.json` 固定 pnpm 12.15.0。若已使用相同版本，可跳过安装；无需全局安装 Nest CLI。`dev:setup` 从 `.env.example` 创建 `.env`，已有文件会保留，不覆盖个人配置。
 
-打开 <http://127.0.0.1:5173>。开发命令先构建共享场景包，再共同监听场景包、前端和后端；API 初次编译需稍等。按 `Ctrl+C` 停止共享包监听及前后端；数据库和 Redis 继续运行。
+打开 <http://127.0.0.1:5173>。开发命令依次构建共享场景包和播放器包，再共同监听这两个包、前端和后端；API 初次编译需稍等。按 `Ctrl+C` 停止共享包监听及前后端；数据库和 Redis 继续运行。
 
 默认进入空白画布；顶部“服务检查”保留原来的 API 状态检查，切换回来保留当前编辑。画布本身不等待 API 连接。添加元素后可直接拖动，按 Shift 多选或从图层选择子元素；属性修改点击“应用属性”后作为一步历史提交。删除组合包括全部后代；拆组保持画面位置，隐藏组合拆开后其直接子元素仍隐藏。
+
+工具栏“预览”读取当前已提交场景，未应用的属性草稿不会进入画面；拖动时禁用预览。返回编辑保留原选区、历史与属性草稿，不增加修订；切换视图卸载隐藏场景的绘制，避免图表实例重复驻留。播放器仅只读消费当前会话，没有保存或发布。
 
 点击“添加柱状图”创建 480×320 的空图表，小画布逐维限制尺寸。属性区用“添加数据”增加分类/数值行，行末按钮删除该行；草稿不会立即写入场景，点击“应用属性”后与坐标、尺寸、可见性修改合为一步历史。可清空全部行，支持负数和零；最多 100 行，类别长度 1–100 且不能全为空白，数值须有限且绝对值不超过 `1e12`。非法输入显示错误并保留原场景。图表使用手填静态数据，不连接 API、数据库或自动刷新。
 
 画布和图层支持右键菜单，聚焦画布后可用 Shift+F10 打开菜单，工具栏“更多操作”提供同等入口。右键未选对象切换目标，命中已选对象或被选中祖先覆盖的后代时保留选区；空白处保留选区，菜单显示当前数量。打开或取消菜单不记历史，菜单操作与工具栏复用同一命令；切换视图时关闭菜单并取消拖动。
 
-只运行前端时，先执行 `pnpm --filter @neobo/scene build`，再运行 `pnpm --filter @neobo/web dev`；根 `pnpm dev` 仍统一管理前后端，任一服务启动失败时会停止关联开发进程。
+只运行前端时，依次执行 `pnpm --filter @neobo/scene build` 和 `pnpm --filter @neobo/player build`，再运行 `pnpm --filter @neobo/web dev`；根 `pnpm dev` 仍统一管理前后端，任一服务启动失败时会停止关联开发进程。
 
 同级非连续元素允许组合，新组放在最上方选中元素所在层；组内保持原顺序，这可能改变与未选图层的遮挡关系。组合宽高定义边界与旋转中心，不缩放子元素；组合/拆组每次最多 49 个直接目标，超过范围会拒绝，不拆成多个历史步骤。
 
 ## 终端输出
 
-`pnpm dev` 以灰色 `[SCENE]`、青色 `[API]`、紫色 `[WEB]` 区分共享包与服务，根启动器只显示通用启动提示，品牌艺术字由后端输出。只保留一层模块标签；API 使用 `pino-pretty` 显示 UTC 时间、级别和受控事件字段，编译错误照常输出，代码重启保留已有记录。
+`pnpm dev` 以灰色 `[SCENE]`、蓝色 `[PLAYER]`、青色 `[API]`、紫色 `[WEB]` 区分共享包与服务，根启动器只显示通用启动提示，品牌艺术字由后端输出。只保留一层模块标签；API 使用 `pino-pretty` 显示 UTC 时间、级别和受控事件字段，编译错误照常输出，代码重启保留已有记录。
 
 启动提示表示“正在启动”，不代表端口或数据库已就绪。API 真正监听成功后输出青色 neobo 艺术字及实际绑定地址、端口，健康检查路径为 `/api/health`；Vite 显示自身实际启动结果。艺术字表示 API 已监听，PostgreSQL / Redis 状态仍以 `/api/ready` 为准。禁色时艺术字保留为纯文本，生产不输出艺术字。
 
-共享场景包首次强制构建，再进入同一 TypeScript build 模式监听，产物与增量状态都位于该包 `dist`；初次监听无需再次写入产物。共享包重建后，使用它的开发工具或服务读取最新产物；默认应用当前尚未挂载场景业务路由。
+共享场景包、播放器包按依赖顺序首次强制构建，再进入同一 TypeScript build 模式监听，产物与增量状态分别位于各包 `dist`；初次监听无需再次写入产物。共享包重建后，使用它的开发工具或服务读取最新产物；默认应用当前尚未挂载场景业务路由。
 
-API 首次使用 TypeScript build 模式强制编译，再进入同一构建模式的监听，避免监听启动时重复写入产物而触发第二次启动。每次后端启动成功只打印一次艺术字，修改后端代码导致的正常重启仍会打印。调整开发脚本或启动配置后，停止旧的 `pnpm dev` 再重新运行。
+API 首次使用 TypeScript build 模式强制编译，再进入同一构建模式的监听，避免监听启动时重复写入产物而触发第二次启动。每次后端启动成功只打印一次艺术字，修改后端代码导致的正常重启仍会打印。调整开发脚本或启动配置后，停止旧的 `pnpm dev` 再重新运行。首次构建期间按 Ctrl+C 也会停止启动，不继续进入下一包或启动服务。
 
 交互终端自动启用颜色，重定向到文件、CI 或显式禁色时使用纯文本。需要主动关闭颜色可执行：
 
@@ -111,17 +113,19 @@ pnpm --filter @neobo/web ui:add <组件名>
 
 ## 场景组件注册
 
-场景原子组件的 Web 注册接口位于 `apps/web/src/scene/component-registry.ts`，内置声明位于同目录 `components.tsx`；它与前述应用 UI 控件职责不同。当前注册 `text`、`rectangle`、`bar-chart` 的 `componentVersion: 1`，统一管理 `label`、`defaultSize`、`render`，文字另有 `defaultText`，柱状图另有独立冻结的 `defaultData`。编辑器通过创建入口生成节点，再走原有命令提交；图层与属性标签、`SceneView` 绘制也读取这些声明。
+场景原子组件的注册接口位于 `packages/player/src/component-registry.ts`，内置声明位于同目录 `components.tsx`；它与前述应用 UI 控件职责不同。当前注册 `text`、`rectangle`、`bar-chart` 的 `componentVersion: 1`，统一管理 `label`、`defaultSize`、`render`，文字另有 `defaultText`，柱状图另有独立冻结的 `defaultData`。Web 编辑器通过 `editor/create-scene-component.ts` 生成节点，再走原有命令提交；图层与属性标签、`SceneView` 绘制也读取这些声明。
 
-只读 `SceneView` 及创建/绘制辅助函数可接收显式注册表，替换已有类型的默认值或表现。组合仍由场景树处理；注册表不会自行增加共享契约的合法类型，也不加载动态插件。React 与 ECharts 绘制留在 Web，不进入 `@neobo/scene`；开发示例与限制见 [注册入口说明](../apps/web/src/scene/README.md)、[ADR 0007](decisions/0007-component-registry.md) 和 [柱状图决定](decisions/0008-static-bar-chart.md)。
+只读 `ScenePlayer` / `SceneView` 及编辑器创建工厂可接收显式注册表，替换已有类型的默认值或表现。组合仍由场景树处理；注册表不会自行增加共享契约的合法类型，也不加载动态插件。React 与 ECharts 绘制位于 `@neobo/player`，仅使用 `@neobo/scene/document` 的文档与校验；通过公共包出口消费，不导入私有实现。开发示例与限制见 [播放器说明](../packages/player/README.md)、[ADR 0009](decisions/0009-readonly-player.md) 和 [柱状图决定](decisions/0008-static-bar-chart.md)。
 
 ECharts 6.1.0 的实际绘制代码仅在柱状图出现时懒加载，使用按需 SVG 渲染、显式逻辑尺寸和对称销毁，不为每次拖动或窗口变化新增图表实例。模块加载或图表运行失败时显示固定错误并保留节点编辑入口；已加载模块的运行时失败可在数据或尺寸改变后重建。模块下载失败没有自动重试，编辑数据不能重新下载；刷新会清空当前会话。修改默认值、标签或绘制后按既有检查流程验收，涉及实际画面时执行下方浏览器回归。
 
 ## 构建与第三方许可
 
-运行 `pnpm --filter @neobo/web build` 后，Web 产物位于 `apps/web/dist`。Vite 的 `build.license` 生成 `dist/licenses.md`，收录 ECharts、zrender、tslib 等依赖的许可文本；`apps/web/public/echarts-NOTICE` 保留 ECharts 上游 NOTICE 原文，构建时复制为 `dist/echarts-NOTICE`。
+在根目录运行 `pnpm -r build` 按依赖顺序构建，或先构建 Scene、Player 再运行 Web build。运行 `pnpm --filter @neobo/web build` 后，Web 产物位于 `apps/web/dist`。Vite 的 `build.license` 生成 `dist/licenses.md`，收录 ECharts、zrender、tslib 等依赖的许可文本；`apps/web/public/echarts-NOTICE` 保留 ECharts 上游 NOTICE 原文，构建时复制为 `dist/echarts-NOTICE`。
 
-分发构建目录时一并保留上述文件。更新图表依赖时核对上游许可和 NOTICE，重新构建并检查产物；第三方许可不代表本仓库整体许可证已确定，也不代表已完成发布或部署。
+播放器包输出未打包的 ESM 与声明，ECharts 由宿主打包；独立宿主也需保留依赖许可与 ECharts 官方 NOTICE。
+
+分发 Web 构建目录时一并保留上述文件。更新图表依赖时核对上游许可和 NOTICE，重新构建并检查产物；第三方许可不代表本仓库整体许可证已确定，也不代表已完成发布或部署。
 
 ## 浏览器验证
 
@@ -129,13 +133,14 @@ ECharts 6.1.0 的实际绘制代码仅在柱状图出现时懒加载，使用按
 
 ```bash
 pnpm --filter @neobo/scene build
+pnpm --filter @neobo/player build
 pnpm exec playwright install --with-deps --only-shell chromium
 pnpm test:browser
 ```
 
 Playwright 版本固定为 1.64.1，仅为开发依赖。浏览器安装步骤可能需要系统包权限；已具备运行库时可只执行 `pnpm exec playwright install --only-shell chromium`。具体系统支持以 [官方浏览器安装说明](https://playwright.dev/docs/browsers) 为准。
 
-测试自行启动 `127.0.0.1:4174` 的 Vite 服务，不复用已有进程，不需要数据库或真实 API。端口被占用时明确失败，结束后释放自己的服务与浏览器。失败 trace 和截图位于被忽略的 `apps/web/test-results/`；查阅后删除该目录即可，不提交临时报告。当前覆盖 Chromium 桌面和窄屏布局，未声称其他浏览器、真机触控或性能验收。
+测试自行启动 `127.0.0.1:4174` 的 Vite 服务，不复用已有进程，不需要数据库或真实 API。端口被占用时明确失败，结束后释放自己的服务与浏览器。失败 trace 和截图位于被忽略的 `apps/web/test-results/`；查阅后删除该目录即可，不提交临时报告。当前覆盖 Chromium 桌面、低高度横屏和窄屏布局，以及只读预览与返回时的历史、草稿和资源释放，未声称其他浏览器、真机触控或性能验收。
 
 ## 日常命令
 
@@ -146,7 +151,7 @@ Playwright 版本固定为 1.64.1，仅为开发依赖。浏览器安装步骤�
 | `pnpm infra:up`   | 启动开发数据库、Redis，并等待容器健康                   |
 | `pnpm infra:logs` | 查看开发基础服务日志                                    |
 | `pnpm infra:down` | 停止并移除开发容器，保留数据卷                          |
-| `pnpm dev`        | 构建并监听共享场景包，同时启动前后端开发进程            |
+| `pnpm dev`        | 构建并监听场景、播放器包，同时启动前后端开发进程        |
 | `pnpm check`      | 格式、文档、仓库规则，以及业务包 lint、类型、测试和构建 |
 | `pnpm audit:deps` | 联网检查依赖通告，高危及以上失败                        |
 

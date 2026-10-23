@@ -1,6 +1,6 @@
 # 场景契约
 
-`@neobo/scene` 提供第一版二维场景文档、严格运行时校验、统一原子命令和单人撤销/重做内核，支持文字、矩形、静态单系列柱状图和组合。本包不依赖 React、ECharts 或其他渲染框架；现有 Web 绘制与组件注册见 [场景绘制模块](../../apps/web/src/scene/README.md)。存储、权限和主题加载仍待实现。
+`@neobo/scene` 提供第一版二维场景文档、严格运行时校验、统一原子命令和单人撤销/重做内核，支持文字、矩形、静态单系列柱状图和组合。本包不依赖 React、ECharts 或其他渲染框架；现有 React 绘制与组件注册见 [独立播放器包](../player/README.md)。存储、权限和主题加载仍待实现。
 
 ```ts
 import { createEmptyScene, validateSceneDocument } from '@neobo/scene';
@@ -18,6 +18,8 @@ if (result.success) {
   void document;
 }
 ```
+
+`@neobo/scene/document` 是文档、类型及校验的独立公开子路径，供只读消费者使用，不引入命令、历史或几何规划；根入口继续保持原有兼容导出。
 
 输入使用 `unknown`，成功返回独立校验产物；失败仅返回固定问题码和安全字段路径，不返回原始输入或库错误。所有字段都需显式提供，未知字段和未知版本会拒绝，不能通过删除字段或隐式类型转换让输入变成成功。
 

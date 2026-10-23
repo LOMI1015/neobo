@@ -1,3 +1,4 @@
+import type * as PlayerModule from '@neobo/player';
 import {
   SCENE_LIMITS,
   createEmptyScene,
@@ -11,11 +12,25 @@ import { Editor } from './Editor';
 import { PropertiesPanel } from './PropertiesPanel';
 
 // 编辑器只验证命令与草稿；实际 ECharts 尺寸和绘制由浏览器验收。
-vi.mock('../scene/BarChartView', () => ({
-  BarChartView: ({ node }: { readonly node: BarChartNode }) => (
-    <g data-testid="bar-chart-render" data-chart-data={JSON.stringify(node.data)} />
-  ),
-}));
+vi.mock('@neobo/player', async (importOriginal) => {
+  const player = await importOriginal<typeof PlayerModule>();
+  const registry = player.createSceneComponentRegistry([
+    player.sceneComponents.resolve('text', 1),
+    player.sceneComponents.resolve('rectangle', 1),
+    {
+      ...player.sceneComponents.resolve('bar-chart', 1),
+      render: (node: BarChartNode) => (
+        <g data-testid="bar-chart-render" data-chart-data={JSON.stringify(node.data)} />
+      ),
+    },
+  ]);
+  return {
+    ...player,
+    SceneView: ({ document }: { readonly document: SceneDocument }) => (
+      <player.SceneView document={document} registry={registry} />
+    ),
+  };
+});
 
 function chart(data: BarChartNode['data'] = []): BarChartNode {
   return {

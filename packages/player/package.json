@@ -1,0 +1,37 @@
+{
+  "name": "@neobo/player",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsc --build tsconfig.build.json --watch --preserveWatchOutput",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc --build tsconfig.build.json --force"
+  },
+  "dependencies": {
+    "@neobo/scene": "workspace:*",
+    "echarts": "6.1.0"
+  },
+  "peerDependencies": {
+    "react": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "vite": "8.3.5"
+  }
+}
