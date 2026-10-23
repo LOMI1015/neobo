@@ -2,7 +2,7 @@
 
 通过 AI 对话与自由画布，搭建包含丰富动效和三维场景的数据大屏。
 
-neobo 面向开源、自托管：以原子元素自由组合，功能底座与可独立导入的主题包分离，支持数据库、接口及多种大模型。
+neobo 面向开源、自托管，目标是以原子元素自由组合，将功能底座与独立主题包分离，并接入数据库、接口及多种大模型。
 
 > 当前已提供二维画布（文字、矩形、组合及撤销/重做）、本地数据库环境和 API 请求日志基础。编辑内容仅在当前会话中，保存、主题和 AI 看板功能尚未实现。
 
@@ -16,7 +16,9 @@ neobo 面向开源、自托管：以原子元素自由组合，功能底座与�
 
 ## 技术方向
 
-TypeScript；React + Vite；shadcn/ui + Tailwind CSS；ECharts + three.js；**NestJS + Fastify**；PostgreSQL；Redis + BullMQ。
+当前使用 TypeScript、React + Vite、shadcn/ui + Tailwind CSS、**NestJS + Fastify**；共享场景包提供契约、校验、命令和历史，本地基础服务为 PostgreSQL、Redis。
+
+ECharts、three.js、BullMQ、数据连接器及模型适配属于后续技术方向。
 
 ## 本地开发
 
@@ -32,9 +34,11 @@ pnpm dev
 
 打开 <http://127.0.0.1:5173> 进入画布，可切换到服务检查；画布编辑不依赖 API 连接。后端位于 `127.0.0.1:3000`，开发数据库和 Redis 使用 `15432`、`16379` 端口。完整步骤与故障处理见 [本地开发指南](docs/local-development.md)。
 
-开发终端以 `[API]` / `[WEB]` 彩色标签区分服务；`NO_COLOR=1 pnpm dev` 可关闭颜色，非交互输出自动使用纯文本。
+开发终端以 `[SCENE]` / `[API]` / `[WEB]` 标签区分共享包与服务；`NO_COLOR=1 pnpm dev` 可关闭颜色，非交互输出自动使用纯文本。
 
 应用控件与样式使用统一的 shadcn/ui 公共组件和设计变量，图层及画布提供右键菜单；组件添加与维护见 [前端公共组件](docs/local-development.md#前端公共组件)。
+
+文字、矩形已接入 Web 组件注册入口，统一标签、创建默认值和绘制；开发方式见 [场景组件注册](apps/web/src/scene/README.md)。当前仅支持已有的两种第一版原子元素，未接入图表、动态插件或完整播放器。
 
 执行 `pnpm check` 检查格式、文档、工作流规则，先按依赖顺序构建，再执行所有业务包的 `lint`、`typecheck`、`test`；缺少检查时 CI 失败。
 

@@ -1,7 +1,10 @@
 import type { SceneDocument, SceneNode } from '@neobo/scene';
+import { sceneComponents } from '../scene/components';
 
 export function nodeTitle(node: SceneNode): string {
-  return node.type === 'text' ? '文字' : node.type === 'rectangle' ? '矩形' : '组合';
+  return node.type === 'group'
+    ? '组合'
+    : sceneComponents.resolve(node.type, node.componentVersion).label;
 }
 
 export function toggleSelection(current: readonly string[], nodeId: string): string[] {
