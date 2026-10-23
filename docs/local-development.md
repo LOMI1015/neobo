@@ -88,6 +88,21 @@ curl --fail http://127.0.0.1:3000/api/ready
 
 `/api/health` 返回成功，只代表 API 进程可响应。`/api/ready` 检查 PostgreSQL 和 Redis，两者可用时返回 HTTP 200，否则返回 503。服务检查视图使用前一个接口，不能据此认定数据库已经就绪。
 
+## 前端公共组件
+
+Web 已配置 Tailwind CSS 4.3.3、shadcn/ui 的 Radix + Nova 源码及 Vite/TypeScript/Vitest 一致的 `@/*` 别名；正常开发仍使用冻结安装和 `pnpm dev`。设计变量在 `apps/web/src/styles.css`，公共组件在 `apps/web/src/components/ui`，不逐页建立另一套控件样式。
+
+添加确有需要的组件时，先预览再执行，例如：
+
+```bash
+pnpm --filter @neobo/web ui:add button --dry-run
+pnpm --filter @neobo/web ui:add <组件名>
+```
+
+`ui:add` 固定调用 shadcn 4.22.1，需网络，仅用于手动生成组件。CLI 的间接依赖存在未修复高危通告，因此不作为项目常驻依赖或在 CI 运行；仅对已核对的官方组件使用，不接收上传文件或不可信注册表。当前所需的 CSS 状态变体已按官方 eject 方式保留在 `apps/web/src/shadcn.css`，来源许可位于公共组件目录。新增组件后核对变体、许可、依赖精确版本及锁文件，不直接覆盖本地改动或重新加入 CLI 常驻依赖。[官方 CLI 说明](https://ui.shadcn.com/docs/cli#eject)、[接入决定](decisions/0006-editor-ui.md)。
+
+修改公共组件或样式后运行 `pnpm check`；菜单、拖动或布局变化再在本地运行下方浏览器验证。jsdom 不提供布局观察，测试仅补齐 ResizeObserver 接口；实际尺寸、定位和焦点由真实 Chromium 验收。
+
 ## 浏览器验证
 
 `pnpm check` 包含 jsdom 组件/交互测试。画布交互或渲染变更时，提交前在本地运行以下真实 Chromium 回归，并在 PR 中记录结果；CI 不安装或运行浏览器：

@@ -1,4 +1,4 @@
-import { useCallback, useState, type PointerEvent } from 'react';
+import { useCallback, useState, type MouseEvent, type PointerEvent } from 'react';
 import {
   createEmptyScene,
   createGroupCommandBatch,
@@ -11,6 +11,8 @@ import {
   type SceneNode,
 } from '@neobo/scene';
 import { SceneView } from '../scene/SceneView';
+import { Button } from '../components/ui/button';
+import { EditorActionsMenu, EditorContextMenu, type EditorMenuActions } from './EditorMenus';
 import { LayerList } from './LayerList';
 import { PropertiesPanel, type NodeChanges } from './PropertiesPanel';
 import { commandErrorMessage, nextNodeId, selectionRoots, toggleSelection } from './selection';
@@ -22,6 +24,8 @@ export interface EditorProps {
   readonly active?: boolean;
 }
 
+type MenuSource = 'canvas' | 'layers' | 'actions';
+
 export function Editor({ initialDocument, active = true }: EditorProps) {
   const [history] = useState(() =>
     createSceneHistory(
@@ -31,6 +35,9 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
   const [document, setDocument] = useState(() => history.current());
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const [menu, setMenu] = useState<{ source: MenuSource; revision: number } | null>(null);
+  // 隐藏视图或场景推进后立即关闭菜单，避免 Portal 留在编辑器外使用过时上下文。
+  if (menu && (!active || menu.revision !== document.revision)) setMenu(null);
 
   const accept = useCallback((nextDocument: SceneDocument) => {
     setDocument(nextDocument);
@@ -53,7 +60,12 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
     [accept, history],
   );
 
-  const drag = useSceneDrag({ document, enabled: active, onCommit: execute, onError: setError });
+  const drag = useSceneDrag({
+    document,
+    enabled: active && menu === null,
+    onCommit: execute,
+    onError: setError,
+  });
   const displayDocument = drag.preview ?? document;
   const singleNode =
     selectedIds.length === 1
@@ -139,8 +151,50 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
     execute(batch([{ type: 'node.update', nodeId: node.id, changes }]));
   }
 
+  function changeMenu(source: MenuSource, open: boolean) {
+    if (open) {
+      if (!active || drag.active) return;
+      setMenu({ source, revision: document.revision });
+    } else {
+      setMenu((current) => (current?.source === source ? null : current));
+    }
+  }
+
+  function contextMenu(event: MouseEvent<HTMLElement>) {
+    if (!active || drag.active) {
+      event.preventDefault();
+      return;
+    }
+    const target = event.target;
+    const element =
+      target instanceof Element ? target.closest('[data-node-id], [data-editor-node-id]') : null;
+    const nodeId =
+      element?.getAttribute('data-node-id') ?? element?.getAttribute('data-editor-node-id');
+    if (!nodeId) return;
+    const coveredBySelection = !selectionRoots(document, [...selectedIds, nodeId]).includes(nodeId);
+    if (!selectedIds.includes(nodeId) && !coveredBySelection) setSelectedIds([nodeId]);
+    setError('');
+  }
+
+  const menuActions: EditorMenuActions = {
+    selectionCount: selectedIds.length,
+    canGroup: selectedIds.length >= 2,
+    canUngroup: singleNode?.type === 'group',
+    canUndo: history.canUndo(),
+    canRedo: history.canRedo(),
+    singleVisible: singleNode?.visible,
+    onGroup: groupSelected,
+    onUngroup: ungroupSelected,
+    onDelete: removeSelected,
+    onToggleVisible: () => {
+      if (singleNode) updateNode(singleNode, { visible: !singleNode.visible });
+    },
+    onUndo: () => restore('undo'),
+    onRedo: () => restore('redo'),
+  };
+
   function onPointerDown(event: PointerEvent<SVGSVGElement>) {
-    if (event.button !== 0 || !event.isPrimary || drag.active) return;
+    if (event.button !== 0 || !event.isPrimary || drag.active || menu !== null) return;
     const target = event.target;
     const nodeId =
       target instanceof Element
@@ -166,52 +220,72 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
     <section className="editor" aria-label="二维场景编辑器">
       <div className="editor-toolbar" role="toolbar" aria-label="编辑工具">
         <div className="editor-tool-group">
-          <button type="button" disabled={drag.active} onClick={() => add('text')}>
+          <Button
+            variant="outline"
+            type="button"
+            disabled={drag.active}
+            onClick={() => add('text')}
+          >
             <span aria-hidden="true">T</span> 添加文字
-          </button>
-          <button type="button" disabled={drag.active} onClick={() => add('rectangle')}>
+          </Button>
+          <Button
+            variant="outline"
+            type="button"
+            disabled={drag.active}
+            onClick={() => add('rectangle')}
+          >
             <span aria-hidden="true">□</span> 添加矩形
-          </button>
+          </Button>
         </div>
         <div className="editor-tool-group">
-          <button
+          <Button
+            variant="outline"
             type="button"
             disabled={drag.active || selectedIds.length < 2}
             onClick={groupSelected}
           >
             组合
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
             type="button"
             disabled={drag.active || singleNode?.type !== 'group'}
             onClick={ungroupSelected}
           >
             拆组
-          </button>
-          <button
-            className="editor-delete"
+          </Button>
+          <Button
+            variant="destructive"
             type="button"
             disabled={drag.active || selectedIds.length === 0}
             onClick={removeSelected}
           >
             删除
-          </button>
+          </Button>
         </div>
         <div className="editor-tool-group editor-history-tools">
-          <button
+          <Button
+            variant="outline"
             type="button"
             disabled={drag.active || !history.canUndo()}
             onClick={() => restore('undo')}
           >
             撤销
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
             type="button"
             disabled={drag.active || !history.canRedo()}
             onClick={() => restore('redo')}
           >
             重做
-          </button>
+          </Button>
+          <EditorActionsMenu
+            actions={menuActions}
+            disabled={!active || drag.active}
+            open={menu?.source === 'actions' && active}
+            onOpenChange={(open) => changeMenu('actions', open)}
+          />
         </div>
       </div>
       <div className="editor-session">
@@ -227,25 +301,31 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
         </div>
       )}
       <div className="editor-workspace">
-        <aside
-          className="editor-sidebar editor-layer-panel"
-          aria-labelledby="editor-layers-heading"
+        <EditorContextMenu
+          label="图层操作"
+          actions={menuActions}
+          disabled={!active || drag.active}
+          open={menu?.source === 'layers' && active}
+          onOpenChange={(open) => changeMenu('layers', open)}
         >
-          <div className="editor-panel-heading">
-            <h2 id="editor-layers-heading">图层</h2>
-            <span>{document.nodes.length}</span>
-          </div>
-          <LayerList
-            document={document}
-            selectedIds={selectedIds}
-            disabled={drag.active}
-            onSelect={select}
-            onToggleVisible={(node) => updateNode(node, { visible: !node.visible })}
-          />
-          <p className="editor-help editor-layer-help">
-            Shift + 点击多选。图层从上到下排列，隐藏元素仍可选择。
-          </p>
-        </aside>
+          <aside
+            className="editor-sidebar editor-layer-panel"
+            aria-labelledby="editor-layers-heading"
+            onContextMenu={contextMenu}
+          >
+            <div className="editor-panel-heading">
+              <h2 id="editor-layers-heading">图层</h2>
+              <span>{document.nodes.length}</span>
+            </div>
+            <LayerList
+              document={document}
+              selectedIds={selectedIds}
+              disabled={drag.active}
+              onSelect={select}
+              onToggleVisible={(node) => updateNode(node, { visible: !node.visible })}
+            />
+          </aside>
+        </EditorContextMenu>
         <div className="editor-stage-panel">
           <div className="editor-canvas-heading">
             <span>场景画布</span>
@@ -253,42 +333,50 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
               {document.canvas.width} × {document.canvas.height}
             </span>
           </div>
-          <div className="editor-stage">
-            <svg
-              className="editor-canvas"
-              viewBox={`0 0 ${document.canvas.width} ${document.canvas.height}`}
-              width={document.canvas.width}
-              height={document.canvas.height}
-              role="img"
-              aria-label="场景画布"
-              onPointerDown={onPointerDown}
-              onPointerMove={drag.onPointerMove}
-              onPointerUp={drag.onPointerUp}
-              onPointerCancel={drag.onPointerCancel}
-              onLostPointerCapture={drag.onLostPointerCapture}
+          <EditorContextMenu
+            label="画布操作"
+            actions={menuActions}
+            disabled={!active || drag.active}
+            open={menu?.source === 'canvas' && active}
+            onOpenChange={(open) => changeMenu('canvas', open)}
+          >
+            <div
+              className="editor-stage"
+              onContextMenu={contextMenu}
+              tabIndex={0}
+              role="group"
+              aria-label="画布操作"
             >
-              <SceneView document={displayDocument} />
-              <g className="editor-selection" pointerEvents="none" aria-hidden="true">
-                {selectedIds.map((id) => {
-                  const corners = getNodeWorldCorners(displayDocument, id);
-                  return corners ? (
-                    <polygon
-                      key={id}
-                      points={corners.map((point) => `${point.x},${point.y}`).join(' ')}
-                    />
-                  ) : null;
-                })}
-              </g>
-            </svg>
-            {document.nodes.length === 0 && (
-              <div className="editor-canvas-empty">
-                <strong>从一张白板开始</strong>
-                <span>添加文字或矩形，创建你的第一个场景。</span>
-              </div>
-            )}
-          </div>
+              <svg
+                className="editor-canvas"
+                viewBox={`0 0 ${document.canvas.width} ${document.canvas.height}`}
+                width={document.canvas.width}
+                height={document.canvas.height}
+                role="img"
+                aria-label="场景画布"
+                onPointerDown={onPointerDown}
+                onPointerMove={drag.onPointerMove}
+                onPointerUp={drag.onPointerUp}
+                onPointerCancel={drag.onPointerCancel}
+                onLostPointerCapture={drag.onLostPointerCapture}
+              >
+                <SceneView document={displayDocument} />
+                <g className="editor-selection" pointerEvents="none" aria-hidden="true">
+                  {selectedIds.map((id) => {
+                    const corners = getNodeWorldCorners(displayDocument, id);
+                    return corners ? (
+                      <polygon
+                        key={id}
+                        points={corners.map((point) => `${point.x},${point.y}`).join(' ')}
+                      />
+                    ) : null;
+                  })}
+                </g>
+              </svg>
+            </div>
+          </EditorContextMenu>
           <div className="editor-canvas-footer">
-            <span>{drag.active ? '拖动中 · 按 Esc 取消' : '点击选择 · Shift 多选 · 拖动移动'}</span>
+            <span>{drag.active ? '拖动中' : '就绪'}</span>
             <span>{selectedIds.length > 0 ? `已选 ${selectedIds.length} 项` : '未选择元素'}</span>
           </div>
         </div>
@@ -308,17 +396,9 @@ export function Editor({ initialDocument, active = true }: EditorProps) {
             />
           ) : (
             <div className="editor-sidebar-empty">
-              <span className="editor-empty-symbol" aria-hidden="true">
-                ⌘
-              </span>
               <p>
                 {selectedIds.length > 1 ? `已选择 ${selectedIds.length} 个元素` : '选择一个元素'}
               </p>
-              <span>
-                {selectedIds.length > 1
-                  ? '可拖动、组合或删除所选元素。'
-                  : '在画布或图层中选择后编辑属性。'}
-              </span>
             </div>
           )}
         </aside>

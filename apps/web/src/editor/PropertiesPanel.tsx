@@ -1,5 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import type { SceneNode, SceneOperation } from '@neobo/scene';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { nodeTitle } from './selection';
 
 export type NodeChanges = Extract<SceneOperation, { type: 'node.update' }>['changes'];
@@ -19,6 +23,7 @@ const transformFields = [
 ] as const;
 
 export function PropertiesPanel({ node, disabled, onApply }: PropertiesPanelProps) {
+  const visibleId = useId();
   const [values, setValues] = useState(() => ({
     x: String(node.transform.x),
     y: String(node.transform.y),
@@ -75,7 +80,7 @@ export function PropertiesPanel({ node, disabled, onApply }: PropertiesPanelProp
                 {label}
                 {field === 'rotation' ? '（°）' : ''}
               </span>
-              <input
+              <Input
                 name={field}
                 inputMode="decimal"
                 value={values[field]}
@@ -89,29 +94,26 @@ export function PropertiesPanel({ node, disabled, onApply }: PropertiesPanelProp
         {node.type === 'text' && (
           <label className="editor-text-field">
             <span>文字内容</span>
-            <textarea value={text} onChange={(event) => setText(event.target.value)} rows={4} />
+            <Textarea value={text} onChange={(event) => setText(event.target.value)} rows={4} />
           </label>
         )}
-        <label className="editor-checkbox">
-          <input
-            type="checkbox"
+        <div className="editor-checkbox">
+          <Checkbox
+            id={visibleId}
             checked={visible}
-            onChange={(event) => setVisible(event.target.checked)}
+            disabled={disabled}
+            onCheckedChange={(checked) => setVisible(checked === true)}
           />
-          <span>显示元素</span>
-        </label>
-        <p className="editor-help">坐标相对于父级。修改后点击应用，一次提交可整体撤销。</p>
-        {node.type === 'group' && (
-          <p className="editor-help">组合宽高定义边界和旋转中心，不缩放子元素。</p>
-        )}
+          <label htmlFor={visibleId}>显示元素</label>
+        </div>
         {error && (
           <p className="editor-field-error" role="alert">
             {error}
           </p>
         )}
-        <button className="editor-apply" type="submit">
+        <Button className="editor-apply" type="submit">
           应用属性
-        </button>
+        </Button>
       </fieldset>
     </form>
   );

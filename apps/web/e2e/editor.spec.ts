@@ -139,7 +139,7 @@ test('适配画布使用真实 CTM 拖动，画布外释放只形成一步历史
   await page.mouse.move(box.x + box.width + 15, nextStart.y);
   await page.mouse.up();
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
-  await expect(page.getByText('拖动中 · 按 Esc 取消')).toHaveCount(0);
+  await expect(page.getByText('拖动中', { exact: true })).toHaveCount(0);
 });
 
 test('Escape、指针取消和失去捕获不修改场景或新增历史', async ({ page }) => {
@@ -246,10 +246,18 @@ test('窄屏和滚动后画布仍可操作，文字使用 XHTML 换行且不执�
   });
   expect(lines.fragments.length).toBeGreaterThan(3);
   expect(lines.fragments.every((width) => width <= lines.width + 1)).toBe(true);
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth > window.innerWidth,
-  );
-  expect(overflow).toBe(false);
+  const layout = await page.evaluate(() => ({
+    width: document.documentElement.scrollWidth,
+    viewport: window.innerWidth,
+    overflow: [...document.querySelectorAll<HTMLElement>('div, label, fieldset, input, textarea')]
+      .filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+      .map((element) => ({
+        tag: element.tagName,
+        class: element.dataset.slot ?? element.className,
+        width: element.getBoundingClientRect().width,
+      })),
+  }));
+  expect(layout.width, JSON.stringify(layout.overflow)).toBeLessThanOrEqual(layout.viewport);
   await node(page, 'text-1').scrollIntoViewIfNeeded();
   const start = await center(page, 'text-1');
   const before = await screenCorners(page, 'text-1');
@@ -267,7 +275,7 @@ test('窄屏和滚动后画布仍可操作，文字使用 XHTML 换行且不执�
 test('二维工作区展示完整编辑布局和当前选择', async ({ page }, testInfo) => {
   await add(page, '文字');
   await edit(page, {
-    文字内容: '从一张白板开始',
+    文字内容: '示例文字 A',
     'X 坐标': '200',
     'Y 坐标': '180',
     宽度: '600',
@@ -277,7 +285,7 @@ test('二维工作区展示完整编辑布局和当前选择', async ({ page }, 
   await edit(page, { 'X 坐标': '200', 'Y 坐标': '380', 宽度: '720', 高度: '340' });
   await add(page, '文字');
   await edit(page, {
-    文字内容: '文字、形状与组合\n自由构建你的场景',
+    文字内容: '示例文字 B\n第二行内容',
     'X 坐标': '1000',
     'Y 坐标': '420',
     宽度: '600',
@@ -286,4 +294,143 @@ test('二维工作区展示完整编辑布局和当前选择', async ({ page }, 
   await expect(page.getByRole('heading', { name: '图层', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: '属性', exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('canvas-editor.png'), fullPage: true });
+});
+
+test('画布右键切换目标，取消不记历史，菜单删除可一步恢复', async ({ page }, testInfo) => {
+  await add(page, '矩形');
+  await edit(page, { 'X 坐标': '200', 'Y 坐标': '200' });
+  await add(page, '文字');
+  await edit(page, { 'X 坐标': '1000', 'Y 坐标': '550' });
+  const revision = page.getByText('修订 4', { exact: true });
+  const point = await center(page, 'rectangle-1');
+  await page.mouse.click(point.x, point.y, { button: 'right' });
+  const menu = page.getByRole('menu', { name: '画布操作' });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByText('当前已选 1 项')).toBeVisible();
+  await expect(revision).toBeVisible();
+  await expect(menu).toHaveCSS('opacity', '1');
+  await page.screenshot({ path: testInfo.outputPath('canvas-context-menu.png'), fullPage: true });
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(revision).toBeVisible();
+  await expect(layer(page, 'rectangle-1')).toHaveAttribute('aria-pressed', 'true');
+  await expect(layer(page, 'text-1')).toHaveAttribute('aria-pressed', 'false');
+  await page.mouse.click(point.x, point.y, { button: 'right' });
+  await menu.getByRole('menuitem', { name: '删除', exact: true }).click();
+  await expect(node(page, 'rectangle-1')).toHaveCount(0);
+  await expect(node(page, 'text-1')).toBeVisible();
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(node(page, 'rectangle-1')).toBeVisible();
+  await layer(page, 'rectangle-1').click();
+  await expect(page.getByRole('textbox', { name: 'X 坐标', exact: true })).toHaveValue('200');
+});
+
+test('图层右键保留非连续多选，组合后右键子节点仍作用于组合', async ({ page }) => {
+  for (const x of ['200', '700', '1200']) {
+    await add(page, '矩形');
+    await edit(page, { 'X 坐标': x, 'Y 坐标': '350' });
+  }
+  await layer(page, 'rectangle-1').click();
+  await layer(page, 'rectangle-3').click({ modifiers: ['Shift'] });
+  await layer(page, 'rectangle-1').click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: '图层操作' });
+  await expect(menu.getByText('当前已选 2 项')).toBeVisible();
+  await menu.getByRole('menuitem', { name: '组合', exact: true }).click();
+  await expect(node(page, 'group-1').locator(':scope > g')).toHaveCount(2);
+  const point = await center(page, 'rectangle-1');
+  await page.mouse.click(point.x, point.y, { button: 'right' });
+  const canvasMenu = page.getByRole('menu', { name: '画布操作' });
+  await expect(canvasMenu.getByText('当前已选 1 项')).toBeVisible();
+  await canvasMenu.getByRole('menuitem', { name: '拆组', exact: true }).click();
+  await expect(node(page, 'group-1')).toHaveCount(0);
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(node(page, 'group-1').locator(':scope > g')).toHaveCount(2);
+});
+
+test('键盘与可见菜单入口能编辑并恢复焦点，隐藏视图释放菜单浮层', async ({ page }) => {
+  await add(page, '矩形');
+  const trigger = page.getByRole('button', { name: '更多操作', exact: true });
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menu')).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: '隐藏', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  const stage = page.getByRole('group', { name: '画布操作', exact: true });
+  await stage.focus();
+  await page.keyboard.press('Shift+F10');
+  await expect(page.getByRole('menu', { name: '画布操作' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(stage).toBeFocused();
+  await trigger.click();
+  await page.getByRole('menuitem', { name: '隐藏', exact: true }).click();
+  await expect(node(page, 'rectangle-1')).toHaveCount(0);
+  await layer(page, 'rectangle-1').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '显示', exact: true }).click();
+  await expect(node(page, 'rectangle-1')).toBeVisible();
+  await trigger.click();
+  await page
+    .getByRole('button', { name: '服务检查', exact: true, includeHidden: true })
+    .evaluate((element) => {
+      if (!(element instanceof HTMLElement)) throw new Error('视图入口必须为 HTML 控件。');
+      element.click();
+    });
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  expect(
+    await page.locator('body').evaluate((element) => getComputedStyle(element).pointerEvents),
+  ).not.toBe('none');
+  await page.getByRole('button', { name: '画布编辑', exact: true }).click();
+  await expect(node(page, 'rectangle-1')).toBeVisible();
+});
+
+test('窄屏边缘菜单不溢出，应用控件共享设计变量且场景绘制保持独立', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await add(page, '文字');
+  const canvas = page.getByRole('img', { name: '场景画布' });
+  await canvas.scrollIntoViewIfNeeded();
+  const canvasBox = await canvas.boundingBox();
+  if (!canvasBox) throw new Error('画布未布局。');
+  await page.mouse.click(canvasBox.x + canvasBox.width - 2, canvasBox.y + canvasBox.height - 2, {
+    button: 'right',
+  });
+  const menu = page.getByRole('menu', { name: '画布操作' });
+  await expect(menu).toBeVisible();
+  const menuBox = await menu.boundingBox();
+  if (!menuBox) throw new Error('菜单未布局。');
+  expect(menuBox.x).toBeGreaterThanOrEqual(0);
+  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(390);
+  const styles = await menu.evaluate((element) => {
+    const menuStyle = getComputedStyle(element);
+    const rootStyle = getComputedStyle(document.documentElement);
+    return {
+      background: menuStyle.backgroundColor,
+      radius: menuStyle.borderRadius,
+      token: rootStyle.getPropertyValue('--popover').trim(),
+    };
+  });
+  expect(styles.background).toBe('rgb(255, 255, 255)');
+  expect(styles.token).toBe('#fff');
+  expect(styles.radius).toBe('8px');
+  await page.keyboard.press('Escape');
+  const drawnText = node(page, 'text-1').locator('foreignObject > div');
+  const before = await drawnText.evaluate((element) => ({
+    color: getComputedStyle(element).color,
+    font: getComputedStyle(element).fontSize,
+  }));
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--foreground', '#ff00ff');
+  });
+  expect(
+    await drawnText.evaluate((element) => ({
+      color: getComputedStyle(element).color,
+      font: getComputedStyle(element).fontSize,
+    })),
+  ).toEqual(before);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(
+    false,
+  );
+  await expect(page.getByText('添加文字或矩形，创建你的第一个场景。')).toHaveCount(0);
+  await expect(
+    page.getByText('Shift + 点击多选。图层从上到下排列，隐藏元素仍可选择。'),
+  ).toHaveCount(0);
 });

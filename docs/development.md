@@ -57,14 +57,14 @@
 - 复用成熟组件的交互与无障碍能力，公共组件统一处理外观、键盘操作、焦点与关闭行为；页面只提供实际需要的条目、状态和业务回调，不各自复制一套菜单或弹框。允许公共组件内部使用语义化的 `button`、`input` 等 HTML 元素，并统一定制样式。
 - 右键事件仅在需要应用编辑菜单的区域接管，不全页禁用浏览器行为。菜单、属性面板、快捷键和 AI 仍复用同一命令、校验、修订检查与撤销入口。
 
-### 组件库调研
+### 组件库与接入维护
 
-2026-10-23 调研推荐 **shadcn/ui**，作为后续应用公共 UI 的优先候选，当前尚未安装或迁移页面：
+应用公共 UI 采用 **shadcn/ui（Radix + Nova）**，接入决定见 [ADR 0006](decisions/0006-editor-ui.md)：
 
 - 它提供可放入项目并定制的组件源码，适合维护统一外观；源码纳入仓库后需自行 review 和维护。[官方介绍](https://ui.shadcn.com/docs)。
-- 官方提供 React + TypeScript 的既有 Vite 项目接入路径，使用 Tailwind CSS；仓库目前仅有普通 CSS，实际接入需评估全局样式重置、既有选择器与 Vite 配置的兼容，不能把文档支持当成已验证兼容。[Vite 接入](https://ui.shadcn.com/docs/installation/vite)。
-- CSS 变量支持语义颜色及统一圆角；右键菜单可使用 Context Menu，按需引入按钮、输入框、下拉菜单和对话框，统一放在 Web 应用的公共组件目录，不提前创建独立 UI 包。[主题变量](https://ui.shadcn.com/docs/theming)、[右键菜单](https://ui.shadcn.com/docs/components/context-menu)。
-- 项目采用 MIT 许可证；引入源码时保留相应声明。实际接入时核对并固定 CLI、底层组件与依赖版本，审查生成 diff 和锁文件，仅引入当前需要的组件，不默认拉入演示页面或说明文案。[官方许可证](https://github.com/shadcn-ui/ui/blob/main/LICENSE.md)。
+- Tailwind CSS 与 Vite 插件、底层组件依赖固定版本，Vite、TypeScript 和 Vitest 共享路径约定；新增组件需检查全局样式重置、既有选择器和场景绘制是否被意外影响。[Vite 接入](https://ui.shadcn.com/docs/installation/vite)。
+- 语义 CSS 变量集中在 `apps/web/src/styles.css`，公共组件放在 `apps/web/src/components/ui`，不提前创建独立 UI 包。只添加当前需要的组件，右键菜单与可见菜单入口使用同一动作。[主题变量](https://ui.shadcn.com/docs/theming)、[右键菜单](https://ui.shadcn.com/docs/components/radix/context-menu)。
+- 项目采用 MIT 许可证；生成源码的许可保留在 `apps/web/src/components/ui/LICENSE`。按需添加入口和 CSS 维护方式见 [本地开发](local-development.md#前端公共组件)。审查生成 diff 和锁文件，不默认拉入演示页面或说明文案。[官方许可证](https://github.com/shadcn-ui/ui/blob/main/LICENSE.md)。
 
 ## 模块边界
 

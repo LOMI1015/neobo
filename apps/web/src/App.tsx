@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { DevelopmentStatus } from './DevelopmentStatus';
 import { Editor } from './editor/Editor';
 
@@ -13,16 +14,22 @@ export function App() {
           <span className="environment-label">本地工作区</span>
         </div>
         <nav className="workspace-views" aria-label="工作区视图">
-          <button type="button" aria-pressed={view === 'editor'} onClick={() => setView('editor')}>
-            画布编辑
-          </button>
-          <button
+          <Button
             type="button"
+            variant={view === 'editor' ? 'secondary' : 'ghost'}
+            aria-pressed={view === 'editor'}
+            onClick={() => setView('editor')}
+          >
+            画布编辑
+          </Button>
+          <Button
+            type="button"
+            variant={view === 'services' ? 'secondary' : 'ghost'}
             aria-pressed={view === 'services'}
             onClick={() => setView('services')}
           >
             服务检查
-          </button>
+          </Button>
         </nav>
       </header>
       <div hidden={view !== 'editor'}>

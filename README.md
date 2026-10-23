@@ -16,7 +16,7 @@ neobo 面向开源、自托管：以原子元素自由组合，功能底座与�
 
 ## 技术方向
 
-TypeScript；React + Vite；ECharts + three.js；**NestJS + Fastify**；PostgreSQL；Redis + BullMQ。
+TypeScript；React + Vite；shadcn/ui + Tailwind CSS；ECharts + three.js；**NestJS + Fastify**；PostgreSQL；Redis + BullMQ。
 
 ## 本地开发
 
@@ -33,6 +33,8 @@ pnpm dev
 打开 <http://127.0.0.1:5173> 进入画布，可切换到服务检查；画布编辑不依赖 API 连接。后端位于 `127.0.0.1:3000`，开发数据库和 Redis 使用 `15432`、`16379` 端口。完整步骤与故障处理见 [本地开发指南](docs/local-development.md)。
 
 开发终端以 `[API]` / `[WEB]` 彩色标签区分服务；`NO_COLOR=1 pnpm dev` 可关闭颜色，非交互输出自动使用纯文本。
+
+应用控件与样式使用统一的 shadcn/ui 公共组件和设计变量，图层及画布提供右键菜单；组件添加与维护见 [前端公共组件](docs/local-development.md#前端公共组件)。
 
 执行 `pnpm check` 检查格式、文档、工作流规则，先按依赖顺序构建，再执行所有业务包的 `lint`、`typecheck`、`test`；缺少检查时 CI 失败。
 
