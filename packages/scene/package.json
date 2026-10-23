@@ -24,6 +24,7 @@
     "build": "tsc --build tsconfig.build.json --force"
   },
   "dependencies": {
+    "@neobo/theme": "workspace:*",
     "zod": "4.6.7"
   }
 }

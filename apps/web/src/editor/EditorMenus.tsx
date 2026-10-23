@@ -1,11 +1,17 @@
 import { EllipsisIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
+import { SCENE_THEMES, type SceneThemeReference } from '@neobo/theme';
 import { Button } from '../components/ui/button';
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuLabel,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '../components/ui/context-menu';
@@ -14,12 +20,19 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 
 export interface EditorMenuActions {
   readonly selectionCount: number;
+  readonly theme: SceneThemeReference;
+  readonly onThemeChange: (theme: SceneThemeReference) => void;
   readonly canGroup: boolean;
   readonly canUngroup: boolean;
   readonly canUndo: boolean;
@@ -43,6 +56,11 @@ function EditorMenuItems({
   const Item = context ? ContextMenuItem : DropdownMenuItem;
   const Label = context ? ContextMenuLabel : DropdownMenuLabel;
   const Separator = context ? ContextMenuSeparator : DropdownMenuSeparator;
+  const Sub = context ? ContextMenuSub : DropdownMenuSub;
+  const SubTrigger = context ? ContextMenuSubTrigger : DropdownMenuSubTrigger;
+  const SubContent = context ? ContextMenuSubContent : DropdownMenuSubContent;
+  const RadioGroup = context ? ContextMenuRadioGroup : DropdownMenuRadioGroup;
+  const RadioItem = context ? ContextMenuRadioItem : DropdownMenuRadioItem;
 
   return (
     <>
@@ -67,6 +85,25 @@ function EditorMenuItems({
       >
         删除
       </Item>
+      <Separator />
+      <Sub>
+        <SubTrigger>场景主题</SubTrigger>
+        <SubContent aria-label="场景主题">
+          <RadioGroup
+            value={actions.theme.id}
+            onValueChange={(value) => {
+              const theme = SCENE_THEMES.find((entry) => entry.id === value);
+              if (theme) actions.onThemeChange({ id: theme.id, version: theme.version });
+            }}
+          >
+            {SCENE_THEMES.map((theme) => (
+              <RadioItem key={theme.id} value={theme.id}>
+                {theme.label}
+              </RadioItem>
+            ))}
+          </RadioGroup>
+        </SubContent>
+      </Sub>
       <Separator />
       <Item disabled={!actions.canUndo} onSelect={actions.onUndo}>
         撤销

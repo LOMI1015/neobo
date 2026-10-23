@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { sceneThemeReferenceSchema } from '@neobo/theme';
 import {
   barChartDataSchema,
   identifierSchema,
@@ -30,6 +31,7 @@ const destinationShape = {
   index: z.int().nonnegative(),
 };
 const operationSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('scene.theme.set'), theme: sceneThemeReferenceSchema }),
   z.strictObject({ type: z.literal('node.add'), node: nodeSchema, ...destinationShape }),
   z.strictObject({
     type: z.literal('node.update'),
@@ -133,7 +135,8 @@ export function validateSceneRevisionRequest(
 }
 
 type MutableNode = z.infer<typeof nodeSchema>;
-type WorkingDocument = Omit<SceneDocument, 'rootIds' | 'nodes'> & {
+type WorkingDocument = Omit<SceneDocument, 'rootIds' | 'nodes' | 'theme'> & {
+  theme?: SceneDocument['theme'];
   rootIds: string[];
   nodes: MutableNode[];
 };
@@ -260,6 +263,9 @@ function applyOperation(
   operation: SceneOperation,
 ): SceneCommandErrorCode | undefined {
   switch (operation.type) {
+    case 'scene.theme.set':
+      document.theme = { ...operation.theme };
+      return undefined;
     case 'node.add':
       return addNode(document, operation);
     case 'node.update':

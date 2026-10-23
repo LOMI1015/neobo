@@ -61,7 +61,7 @@ test('disables both wrapper and child colors while retaining module labels', asy
         const names = commands.map(({ name }) => name);
         assert.deepEqual(
           names,
-          stage === 1 ? ['SCENE'] : stage === 2 ? ['PLAYER'] : ['SCENE', 'PLAYER', 'API', 'WEB'],
+          [['THEME'], ['SCENE'], ['PLAYER'], ['THEME', 'SCENE', 'PLAYER', 'API', 'WEB']][stage - 1],
         );
         assert.equal(options.prefix, '[{color}{name}{/color}]');
         assert.equal(options.prefixColors, false);
@@ -90,8 +90,8 @@ test('allows colored child output through pipes when the outer terminal supports
       assert.deepEqual(
         options.prefixColors,
         commands.length === 1
-          ? [commands[0].name === 'SCENE' ? 'gray' : 'blue']
-          : ['gray', 'blue', 'cyan', 'magenta'],
+          ? [{ THEME: 'yellow', SCENE: 'gray', PLAYER: 'blue' }[commands[0].name]]
+          : ['yellow', 'gray', 'blue', 'cyan', 'magenta'],
       );
       for (const command of commands) {
         assert.equal(command.env.NEOBO_DEV_COLORS, '1');
@@ -105,61 +105,48 @@ test('allows colored child output through pipes when the outer terminal supports
   assert.doesNotMatch(capture.read(), /\u001b/u);
 });
 
-test('waits for scene then player builds before starting all development watchers', async () => {
+test('waits for theme, scene then player builds before starting development watchers', async () => {
   const capture = captureOutput();
   const calls = [];
-  let finishBuild;
-  const build = new Promise((resolve) => {
-    finishBuild = resolve;
-  });
-  let finishPlayer;
-  const playerBuild = new Promise((resolve) => {
-    finishPlayer = resolve;
-  });
-  let playerStarted;
-  const playerReady = new Promise((resolve) => {
-    playerStarted = resolve;
-  });
+  const packages = ['@neobo/theme', '@neobo/scene', '@neobo/player'];
+  const builds = packages.map(() => Promise.withResolvers());
+  const started = packages.map(() => Promise.withResolvers());
   const development = runDevelopment({
     env: {},
     output: capture.output,
     run(commands, options) {
+      const stage = calls.length;
       calls.push({ commands, options });
-      if (calls.length === 2) playerStarted();
-      return {
-        result: calls.length === 1 ? build : calls.length === 2 ? playerBuild : Promise.resolve([]),
-      };
+      started[stage]?.resolve();
+      return { result: builds[stage]?.promise ?? Promise.resolve([]) };
     },
   });
-  assert.equal(calls.length, 1);
-  assert.deepEqual(
-    calls[0].commands.map(({ command }) => command),
-    ['pnpm --filter @neobo/scene build'],
-  );
-  finishBuild([]);
-  await playerReady;
-  assert.equal(calls.length, 2);
-  assert.deepEqual(
-    calls[1].commands.map(({ command }) => command),
-    ['pnpm --filter @neobo/player build'],
-  );
-  finishPlayer([]);
+  for (const [index, packageName] of packages.entries()) {
+    await started[index].promise;
+    assert.equal(calls.length, index + 1);
+    assert.deepEqual(
+      calls[index].commands.map(({ command }) => command),
+      [`pnpm --filter ${packageName} build`],
+    );
+    builds[index].resolve([]);
+  }
   assert.equal(await development, 0);
   assert.deepEqual(
-    calls[2].commands.map(({ command }) => command),
+    calls[3].commands.map(({ command }) => command),
     [
+      'pnpm --filter @neobo/theme dev',
       'pnpm --filter @neobo/scene dev',
       'pnpm --filter @neobo/player dev',
       'pnpm --filter @neobo/api dev',
       'pnpm --filter @neobo/web dev',
     ],
   );
-  assert.deepEqual(calls[2].options.killOthersOn, ['success', 'failure']);
-  assert.equal(calls[2].options.successCondition, 'all');
+  assert.deepEqual(calls[3].options.killOthersOn, ['success', 'failure']);
+  assert.equal(calls[3].options.successCondition, 'all');
 });
 
 test('propagates failed commands and runner failures without printing untrusted errors', async () => {
-  for (const failedStage of [1, 2, 3]) {
+  for (const failedStage of [1, 2, 3, 4]) {
     for (const throws of [false, true]) {
       let calls = 0;
       const capture = captureOutput();
@@ -182,7 +169,7 @@ test('propagates failed commands and runner failures without printing untrusted 
 
 test('startup cancellation stops later stages even when the runner resolves successfully', async () => {
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-    for (const stopStage of [1, 2]) {
+    for (const stopStage of [1, 2, 3]) {
       const capture = captureOutput();
       const listeners = process.listenerCount(signal);
       let calls = 0;
@@ -205,7 +192,7 @@ test('startup cancellation stops later stages even when the runner resolves succ
 
 test('real concurrently SIGINT cleanup stops startup and releases its process listeners', async () => {
   const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
-  for (const stopStage of [1, 2]) {
+  for (const stopStage of [1, 2, 3]) {
     const listeners = ['SIGINT', 'SIGTERM', 'SIGHUP'].map((signal) =>
       process.listenerCount(signal),
     );

@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { sceneThemeReferenceSchema } from '@neobo/theme';
 
 export const SCENE_SCHEMA_VERSION = 1;
 
@@ -92,6 +93,7 @@ const documentShapeSchema = z.strictObject({
   id: identifierSchema,
   revision: z.int().nonnegative(),
   canvas: z.strictObject({ width: dimensionSchema, height: dimensionSchema }),
+  theme: sceneThemeReferenceSchema.optional(),
   rootIds: z.array(identifierSchema).max(SCENE_LIMITS.maxNodes),
   nodes: z.array(nodeSchema).max(SCENE_LIMITS.maxNodes),
 });
@@ -256,6 +258,8 @@ const knownFields = new Set([
   'id',
   'revision',
   'canvas',
+  'theme',
+  'version',
   'width',
   'height',
   'rootIds',

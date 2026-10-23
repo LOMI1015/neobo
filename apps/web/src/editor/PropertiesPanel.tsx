@@ -24,7 +24,39 @@ const transformFields = [
   ['rotation', '旋转角度'],
 ] as const;
 
-export function PropertiesPanel({ node, disabled, onApply }: PropertiesPanelProps) {
+function samePropertiesSource(current: SceneNode, next: SceneNode): boolean {
+  if (current === next) return true;
+  if (
+    current.id !== next.id ||
+    current.type !== next.type ||
+    current.visible !== next.visible ||
+    transformFields.some(([field]) => current.transform[field] !== next.transform[field])
+  ) {
+    return false;
+  }
+  if (current.type === 'text' && next.type === 'text') return current.text === next.text;
+  if (current.type === 'bar-chart' && next.type === 'bar-chart') {
+    return chartDataEqual(current.data, next.data);
+  }
+  if (current.type === 'group' && next.type === 'group') {
+    return (
+      current.children.length === next.children.length &&
+      current.children.every((id, index) => id === next.children[index])
+    );
+  }
+  return current.type === 'rectangle' && next.type === 'rectangle';
+}
+
+export function PropertiesPanel(props: PropertiesPanelProps) {
+  const [source, setSource] = useState(() => ({ node: props.node, generation: 0 }));
+  // 历史会复制节点；主题变更保留草稿，已提交节点值改变时才整体重置表单。
+  if (!samePropertiesSource(source.node, props.node)) {
+    setSource({ node: props.node, generation: source.generation + 1 });
+  }
+  return <PropertiesForm key={source.generation} {...props} />;
+}
+
+function PropertiesForm({ node, disabled, onApply }: PropertiesPanelProps) {
   const visibleId = useId();
   const [values, setValues] = useState(() => ({
     x: String(node.transform.x),

@@ -4,6 +4,7 @@ import {
   type SceneDocument,
   type SceneNode,
 } from '@neobo/scene/document';
+import { DEFAULT_SCENE_THEME, resolveSceneTheme } from '@neobo/theme';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { StrictMode, useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -84,6 +85,30 @@ describe('公开只读播放器', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(container.querySelector('[data-node-id="old"]')).toBeNull();
     expect(container.querySelector('[data-node-id="new"]')).toBeInTheDocument();
+  });
+
+  it.each([
+    { id: 'synthetic-theme-secret', version: 1 },
+    { id: 'deep-blue', version: 2 },
+  ])('非法主题替换立即卸载旧主题画面，合法替换后按新主题恢复', (theme) => {
+    const dark = { id: 'deep-blue', version: 1 } as const;
+    const document = { ...scene(), theme: dark };
+    const { container, rerender } = render(<ScenePlayer document={document} />);
+    expect(container.querySelector('[data-scene-background]')).toHaveAttribute(
+      'fill',
+      resolveSceneTheme(dark).tokens.canvasBackground,
+    );
+    rerender(<ScenePlayer document={{ ...document, theme }} />);
+    expect(screen.getByRole('alert')).toHaveTextContent(/^场景文档无效或版本不受支持。$/);
+    expect(container.querySelector('svg, [data-node-id], [data-scene-background]')).toBeNull();
+    expect(container).not.toHaveTextContent('synthetic-theme-secret');
+    rerender(<ScenePlayer document={scene([rectangle('recovered')])} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-scene-background]')).toHaveAttribute(
+      'fill',
+      DEFAULT_SCENE_THEME.tokens.canvasBackground,
+    );
+    expect(container.querySelector('[data-node-id="recovered"]')).toBeInTheDocument();
   });
 
   it('绘制消费运行时校验产生的独立节点和变换，不持有输入引用', () => {
@@ -179,7 +204,7 @@ describe('公开只读播放器', () => {
     expect(acquired.size).toBe(0);
     rerender(view(document));
     expect(acquired.size).toBe(1);
-    rerender(view(null));
+    rerender(view({ ...document, theme: { id: 'deep-blue', version: 2 } }));
     expect(acquired.size).toBe(0);
     rerender(view(document));
     expect(acquired.size).toBe(1);

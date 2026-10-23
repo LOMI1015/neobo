@@ -4,6 +4,7 @@ import {
   type SceneDocument,
   type SceneNode,
 } from '@neobo/scene/document';
+import { DEFAULT_SCENE_THEME, resolveSceneTheme, SCENE_THEMES } from '@neobo/theme';
 import { render } from '@testing-library/react';
 import { StrictMode, useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -48,6 +49,69 @@ function ResourceRectangle({
 }
 
 describe('只读二维场景绘制结构', () => {
+  it.each(SCENE_THEMES)('$label统一绘制背景、文字和矩形，保留输入文档与层级', (theme) => {
+    const document: SceneDocument = {
+      ...scene([
+        rectangle('rectangle'),
+        {
+          id: 'text',
+          type: 'text',
+          componentVersion: 1,
+          visible: true,
+          transform,
+          text: '主题文字',
+        },
+      ]),
+      theme: { id: theme.id, version: theme.version },
+    };
+    const original = structuredClone(document);
+    const { container } = renderScene(document);
+    const background = container.querySelector('svg')?.firstElementChild;
+    expect(background).toHaveAttribute('data-scene-background');
+    expect(background).toHaveAttribute('fill', theme.tokens.canvasBackground);
+    expect(background).toHaveAttribute('width', '800');
+    expect(background).toHaveAttribute('height', '600');
+    expect(background).toHaveAttribute('pointer-events', 'none');
+    expect(background).toHaveAttribute('aria-hidden', 'true');
+    expect(background).not.toHaveAttribute('data-node-id');
+    expect(container.querySelector('[data-node-id="rectangle"] > rect')).toHaveAttribute(
+      'fill',
+      theme.tokens.rectangleFill,
+    );
+    expect(container.querySelector('[data-node-id="rectangle"] > rect')).toHaveAttribute(
+      'stroke',
+      theme.tokens.rectangleStroke,
+    );
+    expect(container.querySelector('[data-node-id="text"] foreignObject > div')).toHaveStyle({
+      color: theme.tokens.text,
+    });
+    expect(document).toEqual(original);
+  });
+
+  it('旧文档缺省主题仍用中性浅色，切换主题不重新挂载节点或改动布局', () => {
+    const document = scene([rectangle('rectangle')]);
+    const { container, rerender } = renderScene(document);
+    const node = container.querySelector('[data-node-id="rectangle"]');
+    const shape = node?.firstElementChild;
+    expect(container.querySelector('[data-scene-background]')).toHaveAttribute(
+      'fill',
+      DEFAULT_SCENE_THEME.tokens.canvasBackground,
+    );
+    rerender(
+      <svg>
+        <SceneView document={{ ...document, theme: { id: 'deep-blue', version: 1 } }} />
+      </svg>,
+    );
+    expect(container.querySelector('[data-node-id="rectangle"]')).toBe(node);
+    expect(node?.firstElementChild).toBe(shape);
+    expect(shape).toHaveAttribute(
+      'fill',
+      resolveSceneTheme({ id: 'deep-blue', version: 1 }).tokens.rectangleFill,
+    );
+    expect(node).toHaveAttribute('transform', 'translate(10 20) rotate(0 60 30)');
+    expect(document).not.toHaveProperty('theme');
+  });
+
   it('按根引用顺序绘制，与节点存储顺序无关', () => {
     const { container } = renderScene(
       scene([rectangle('front'), rectangle('back')], ['back', 'front']),
@@ -179,7 +243,7 @@ describe('只读二维场景绘制结构', () => {
     expect(document).toEqual(original);
   });
 
-  it('空组合保留透明命中框，空场景不创建伪元素', () => {
+  it('空组合保留透明命中框，空场景只绘制背景而不创建伪节点', () => {
     const { container, rerender } = renderScene(
       scene([{ id: 'empty', type: 'group', visible: true, transform, children: [] }]),
     );
@@ -195,7 +259,11 @@ describe('只读二维场景绘制结构', () => {
         <SceneView document={scene([])} />
       </svg>,
     );
-    expect(container.querySelector('svg')?.children).toHaveLength(0);
+    expect(container.querySelector('svg')?.children).toHaveLength(1);
+    expect(container.querySelector('svg')?.firstElementChild).toHaveAttribute(
+      'data-scene-background',
+    );
+    expect(container.querySelector('[data-node-id]')).toBeNull();
   });
 
   it('公开注册表替代实际矩形绘制，嵌套顺序、旋转与隐藏语义仍由场景掌管', () => {
@@ -241,10 +309,37 @@ describe('只读二维场景绘制结构', () => {
       'transform',
       'translate(10 20) rotate(0 60 30)',
     );
-    expect(container.querySelectorAll('rect')).toHaveLength(1);
-    expect(container.querySelector('rect')).toHaveAttribute('data-group-frame');
+    expect(container.querySelectorAll('rect:not([data-scene-background])')).toHaveLength(1);
+    expect(container.querySelector('rect:not([data-scene-background])')).toHaveAttribute(
+      'data-group-frame',
+    );
     expect(container.querySelector('[data-node-id="hidden"]')).toBeNull();
     expect(container.querySelector('clipPath, [clip-path], svg svg')).toBeNull();
+  });
+
+  it('自定义注册回调可以组合内置绘制，仍处于当前场景主题上下文内', () => {
+    const registry = createSceneComponentRegistry([
+      {
+        ...sceneComponents.resolve('rectangle', 1),
+        render: (node: RectangleNode) => (
+          <g>{sceneComponents.resolve('rectangle', 1).render(node)}</g>
+        ),
+      },
+    ]);
+    const document: SceneDocument = {
+      ...scene([rectangle('custom')]),
+      theme: { id: 'deep-blue', version: 1 },
+    };
+    const { container } = render(
+      <svg>
+        <SceneView document={document} registry={registry} />
+      </svg>,
+    );
+    const theme = resolveSceneTheme({ id: 'deep-blue', version: 1 });
+    expect(container.querySelector('[data-node-id="custom"] rect')).toHaveAttribute(
+      'fill',
+      theme.tokens.rectangleFill,
+    );
   });
 
   it('登记绘制返回独立有生命周期的组件，隐藏、卸载与StrictMode对称释放资源', () => {

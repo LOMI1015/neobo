@@ -11,6 +11,7 @@ import {
   type SceneNode,
 } from '@neobo/scene';
 import { SceneView, sceneComponents, type SceneComponentType } from '@neobo/player';
+import { resolveSceneTheme, type SceneThemeReference } from '@neobo/theme';
 import { createSceneComponent } from './create-scene-component';
 import { Button } from '../components/ui/button';
 import { EditorActionsMenu, EditorContextMenu, type EditorMenuActions } from './EditorMenus';
@@ -94,6 +95,13 @@ export function Editor({ initialDocument, active = true, onPreview }: EditorProp
     }
   }
 
+  function changeTheme(theme: SceneThemeReference) {
+    if (!active || drag.active) return;
+    const current = resolveSceneTheme(document.theme);
+    if (current.id === theme.id && current.version === theme.version) return;
+    execute(batch([{ type: 'scene.theme.set', theme }]));
+  }
+
   function removeSelected() {
     const roots = selectionRoots(document, selectedIds);
     if (roots.length > SCENE_COMMAND_LIMITS.maxOperations) {
@@ -164,6 +172,8 @@ export function Editor({ initialDocument, active = true, onPreview }: EditorProp
 
   const menuActions: EditorMenuActions = {
     selectionCount: selectedIds.length,
+    theme: resolveSceneTheme(document.theme),
+    onThemeChange: changeTheme,
     canGroup: selectedIds.length >= 2,
     canUngroup: singleNode?.type === 'group',
     canUndo: history.canUndo(),
@@ -393,7 +403,7 @@ export function Editor({ initialDocument, active = true, onPreview }: EditorProp
           </div>
           {singleNode ? (
             <PropertiesPanel
-              key={`${singleNode.id}:${document.revision}`}
+              key={singleNode.id}
               node={singleNode}
               disabled={drag.active}
               onApply={(changes) => updateNode(singleNode, changes)}

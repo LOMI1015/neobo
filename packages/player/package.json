@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@neobo/scene": "workspace:*",
+    "@neobo/theme": "workspace:*",
     "echarts": "6.1.0"
   },
   "peerDependencies": {

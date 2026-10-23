@@ -1,10 +1,12 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { RectangleNode, TextNode } from '@neobo/scene/document';
+import { useContext, type CSSProperties, type ReactNode } from 'react';
 import { BarChartView } from './BarChartView.js';
 import {
   createSceneComponentRegistry,
   type SceneAtomicNode,
   type SceneComponentRegistry,
 } from './component-registry.js';
+import { SceneThemeContext } from './scene-theme.js';
 
 const textStyle: CSSProperties = {
   width: '100%',
@@ -13,12 +15,34 @@ const textStyle: CSSProperties = {
   overflow: 'hidden',
   whiteSpace: 'pre-wrap',
   overflowWrap: 'anywhere',
-  color: '#202c3b',
   fontFamily: 'system-ui, sans-serif',
   fontSize: 32,
   fontWeight: 400,
   lineHeight: 1.5,
 };
+
+function TextView({ node }: { readonly node: TextNode }) {
+  const theme = useContext(SceneThemeContext);
+  return (
+    <foreignObject width={node.transform.width} height={node.transform.height} overflow="hidden">
+      {/* HTML 布局保留换行并自动折行；用户文字始终作为 React 文本节点。 */}
+      <div style={{ ...textStyle, color: theme.text }}>{node.text}</div>
+    </foreignObject>
+  );
+}
+
+function RectangleView({ node }: { readonly node: RectangleNode }) {
+  const theme = useContext(SceneThemeContext);
+  return (
+    <rect
+      width={node.transform.width}
+      height={node.transform.height}
+      fill={theme.rectangleFill}
+      stroke={theme.rectangleStroke}
+      strokeWidth={1}
+    />
+  );
+}
 
 export const sceneComponents = createSceneComponentRegistry([
   {
@@ -27,27 +51,14 @@ export const sceneComponents = createSceneComponentRegistry([
     label: '文字',
     defaultSize: { width: 320, height: 72 },
     defaultText: '文字',
-    render: (node) => (
-      <foreignObject width={node.transform.width} height={node.transform.height} overflow="hidden">
-        {/* HTML 布局保留换行并自动折行；用户文字始终作为 React 文本节点。 */}
-        <div style={textStyle}>{node.text}</div>
-      </foreignObject>
-    ),
+    render: (node) => <TextView node={node} />,
   },
   {
     type: 'rectangle',
     componentVersion: 1,
     label: '矩形',
     defaultSize: { width: 320, height: 180 },
-    render: (node) => (
-      <rect
-        width={node.transform.width}
-        height={node.transform.height}
-        fill="#e4e8ef"
-        stroke="#7c8797"
-        strokeWidth={1}
-      />
-    ),
+    render: (node) => <RectangleView node={node} />,
   },
   {
     type: 'bar-chart',
