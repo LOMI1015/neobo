@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "bar-chart-fixture",
+  "revision": 0,
+  "canvas": { "width": 1920, "height": 1080 },
+  "rootIds": ["chart-1"],
+  "nodes": [
+    {
+      "id": "chart-1",
+      "type": "bar-chart",
+      "componentVersion": 1,
+      "visible": true,
+      "transform": { "x": 100, "y": 100, "width": 600, "height": 360, "rotation": 0 },
+      "data": [
+        { "category": "分类甲", "value": -10 },
+        { "category": "分类乙", "value": 0 },
+        { "category": "分类丙😀", "value": 20.5 }
+      ]
+    }
+  ]
+}

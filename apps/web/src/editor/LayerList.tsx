@@ -40,7 +40,13 @@ export function LayerList({
             onClick={(event: MouseEvent<HTMLButtonElement>) => onSelect(node.id, event.shiftKey)}
           >
             <span className="editor-layer-icon" aria-hidden="true">
-              {node.type === 'text' ? 'T' : node.type === 'rectangle' ? '□' : '▣'}
+              {node.type === 'text'
+                ? 'T'
+                : node.type === 'rectangle'
+                  ? '□'
+                  : node.type === 'bar-chart'
+                    ? '▥'
+                    : '▣'}
             </span>
             <span className="editor-layer-name">
               <span>{node.type === 'text' ? node.text || '空文字' : nodeTitle(node)}</span>

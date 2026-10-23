@@ -185,6 +185,95 @@ describe('场景命令经过真实 NestJS 与 Fastify 请求边界', () => {
     expect(fixture.output()).not.toContain(secret);
   });
 
+  it('柱状图添加、数据替换与删除复用HTTP命令和撤销，非法数据不进入执行器', async () => {
+    const fixture = await start();
+    const node = {
+      id: 'chart-1',
+      type: 'bar-chart',
+      componentVersion: 1,
+      visible: true,
+      transform: { x: 0, y: 0, width: 480, height: 320, rotation: 0 },
+      data: [{ category: secret, value: 12 }],
+    };
+    const added = await fixture.app.inject({
+      method: 'POST',
+      url: route,
+      payload: {
+        sceneId,
+        baseRevision: 0,
+        operations: [{ type: 'node.add', node, parentId: null, index: 0 }],
+      },
+    });
+    expect(added.statusCode).toBe(201);
+    const changedData = [{ category: secret, value: -7.5 }];
+    const updated = await fixture.app.inject({
+      method: 'POST',
+      url: route,
+      payload: {
+        sceneId,
+        baseRevision: 1,
+        operations: [{ type: 'node.update', nodeId: node.id, changes: { data: changedData } }],
+      },
+    });
+    expect(updated.statusCode).toBe(201);
+    expect(fixture.history.current().nodes[0]).toMatchObject({ data: changedData });
+    const undone = await fixture.app.inject({
+      method: 'POST',
+      url: `${route}/undo`,
+      payload: { sceneId, baseRevision: 2 },
+    });
+    expect(undone.statusCode).toBe(201);
+    expect(fixture.history.current().nodes[0]).toEqual(node);
+    const redone = await fixture.app.inject({
+      method: 'POST',
+      url: `${route}/redo`,
+      payload: { sceneId, baseRevision: 3 },
+    });
+    expect(redone.statusCode).toBe(201);
+    expect(fixture.history.current().nodes[0]).toMatchObject({ data: changedData });
+
+    const before = fixture.history.current();
+    const execute = vi.spyOn(fixture.history, 'execute');
+    const rejected = await fixture.app.inject({
+      method: 'POST',
+      url: route,
+      payload: {
+        sceneId,
+        baseRevision: 4,
+        operations: [
+          {
+            type: 'node.update',
+            nodeId: node.id,
+            changes: { data: [{ category: secret, value: secret }] },
+          },
+        ],
+      },
+    });
+    expect(rejected.statusCode).toBe(400);
+    expect(execute).not.toHaveBeenCalled();
+    expect(fixture.history.current()).toEqual(before);
+    expect(rejected.body).not.toContain(secret);
+    const removed = await fixture.app.inject({
+      method: 'POST',
+      url: route,
+      payload: {
+        sceneId,
+        baseRevision: 4,
+        operations: [{ type: 'node.remove', nodeId: node.id }],
+      },
+    });
+    expect(removed.statusCode).toBe(201);
+    expect(fixture.history.current().nodes).toEqual([]);
+    const restored = await fixture.app.inject({
+      method: 'POST',
+      url: `${route}/undo`,
+      payload: { sceneId, baseRevision: 5 },
+    });
+    expect(restored.statusCode).toBe(201);
+    expect(fixture.history.current().nodes[0]).toMatchObject({ data: changedData });
+    expect(fixture.output()).not.toContain(secret);
+  });
+
   it('批次后半失败保持原场景和历史不变，响应与日志不泄漏正文', async () => {
     const fixture = await start();
     const initial = fixture.history.current();

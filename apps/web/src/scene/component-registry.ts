@@ -1,12 +1,13 @@
 import {
   SCENE_SCHEMA_VERSION,
   validateSceneDocument,
+  type BarChartNode,
   type RectangleNode,
   type TextNode,
 } from '@neobo/scene';
 import type { ReactNode } from 'react';
 
-export type SceneAtomicNode = TextNode | RectangleNode;
+export type SceneAtomicNode = TextNode | RectangleNode | BarChartNode;
 export type SceneComponentType = SceneAtomicNode['type'];
 
 interface ComponentDescription<Type extends SceneComponentType> {
@@ -26,11 +27,18 @@ export interface RectangleComponentDescription extends ComponentDescription<'rec
   readonly render: (node: RectangleNode) => ReactNode;
 }
 
-export type SceneComponentDescription = TextComponentDescription | RectangleComponentDescription;
+export interface BarChartComponentDescription extends ComponentDescription<'bar-chart'> {
+  readonly defaultData: BarChartNode['data'];
+  readonly render: (node: BarChartNode) => ReactNode;
+}
+
+export type SceneComponentDescription =
+  TextComponentDescription | RectangleComponentDescription | BarChartComponentDescription;
 
 export interface SceneComponentRegistry {
   resolve(type: 'text', componentVersion: number): TextComponentDescription;
   resolve(type: 'rectangle', componentVersion: number): RectangleComponentDescription;
+  resolve(type: 'bar-chart', componentVersion: number): BarChartComponentDescription;
   resolve(type: string, componentVersion: number): SceneComponentDescription;
 }
 
@@ -55,6 +63,7 @@ function validDescription(description: SceneComponentDescription): boolean {
           visible: true,
           transform: { x: 0, y: 0, width, height, rotation: 0 },
           ...(description.type === 'text' ? { text: description.defaultText } : {}),
+          ...(description.type === 'bar-chart' ? { data: description.defaultData } : {}),
         },
       ],
     }).success
@@ -87,12 +96,24 @@ export function createSceneComponentRegistry(
             defaultText: description.defaultText,
             render: description.render,
           })
-        : Object.freeze({ ...common, type: description.type, render: description.render }),
+        : description.type === 'bar-chart'
+          ? Object.freeze({
+              ...common,
+              type: description.type,
+              defaultData: Object.freeze(
+                description.defaultData.map(({ category, value }) =>
+                  Object.freeze({ category, value }),
+                ),
+              ),
+              render: description.render,
+            })
+          : Object.freeze({ ...common, type: description.type, render: description.render }),
     );
   }
 
   function resolve(type: 'text', componentVersion: number): TextComponentDescription;
   function resolve(type: 'rectangle', componentVersion: number): RectangleComponentDescription;
+  function resolve(type: 'bar-chart', componentVersion: number): BarChartComponentDescription;
   function resolve(type: string, componentVersion: number): SceneComponentDescription;
   function resolve(type: string, componentVersion: number): SceneComponentDescription {
     const description = entries.get(`${type}:${componentVersion}`);

@@ -1,6 +1,6 @@
 # 场景契约
 
-`@neobo/scene` 提供第一版二维场景文档、严格运行时校验、统一原子命令和单人撤销/重做内核，支持文字、矩形和组合。本包不依赖渲染框架；现有 Web 绘制与组件注册见 [场景绘制模块](../../apps/web/src/scene/README.md)。存储、权限和主题加载仍待实现。
+`@neobo/scene` 提供第一版二维场景文档、严格运行时校验、统一原子命令和单人撤销/重做内核，支持文字、矩形、静态单系列柱状图和组合。本包不依赖 React、ECharts 或其他渲染框架；现有 Web 绘制与组件注册见 [场景绘制模块](../../apps/web/src/scene/README.md)。存储、权限和主题加载仍待实现。
 
 ```ts
 import { createEmptyScene, validateSceneDocument } from '@neobo/scene';
@@ -22,6 +22,14 @@ if (result.success) {
 输入使用 `unknown`，成功返回独立校验产物；失败仅返回固定问题码和安全字段路径，不返回原始输入或库错误。所有字段都需显式提供，未知字段和未知版本会拒绝，不能通过删除字段或隐式类型转换让输入变成成功。
 
 坐标、层级、字段与解析上限以 [ADR 0003](../../docs/decisions/0003-scene-contract.md) 为准；[第一版样例](test/fixtures/scene-v1.json) 保留兼容验证。导出的只读类型约束调用方式，不代表运行时对象已冻结，也不替代运行时校验或权限检查。
+
+## 静态柱状图契约
+
+`BarChartNode` 使用 `type: 'bar-chart'`、`componentVersion: 1`，沿用标识、变换和可见性字段，另外必须提供 `data: readonly BarChartDatum[]`。每行仅包含 `category: string`、`value: number`，按数组顺序绘制单系列。空数组合法，不隐式填充演示数据。
+
+`SCENE_LIMITS` 公开 `maxChartDataPoints: 100`、`maxChartCategoryLength: 100` 和 `maxChartValue: 1e12`：最多 100 行，类别按 Unicode 码点计 1–100 且至少包含一个非空白字符，保留原始类别文字；数值必须有限且绝对值不超过 `1e12`，支持负数和零。不做隐式类型转换，未知节点或行字段明确拒绝；不接收任意图表 option、函数或数据源配置，当前不提供动态查询入口。
+
+当前 `schemaVersion` 仍为 `1`，新增读取器继续接受原有文字/矩形/组合的 [旧样例](test/fixtures/scene-v1.json)，柱状图样例见 [新增 fixture](test/fixtures/scene-v1-bar-chart.json)。旧读取器会拒绝不认识的柱状图类型，不保证新文档可被旧读取器加载；本轮没有持久化场景或迁移框架。兼容边界见 [ADR 0008](../../docs/decisions/0008-static-bar-chart.md)。
 
 ## 命令与历史
 
@@ -58,6 +66,8 @@ if (result.success) {
 ```
 
 公开操作为添加、更新、删除和移动节点，具体参数见 [ADR 0004](../../docs/decisions/0004-scene-commands.md)。添加的组合必须为空；通过后续 `node.move` 组织树结构。删除组合会删除全部后代，撤销整体恢复。移动索引相对于移除原节点后的目标列表；修改父节点后保留变换的父局部数值，不自动保持画面位置。需要保持视觉位置时，使用下方可视操作规划；现有 Web 画布已消费组合/拆组规划。
+
+柱状图通过 `node.add` 添加，`node.update` 的 `changes.data` 全量替换行数组；传入 `[]` 清空数据，不是按行合并或追加。数据修改可与变换/可见性合为一条更新，仍只形成一步历史；文字、矩形和组合携带 `changes.data` 会被拒绝。命令与历史复制节点及数据行，撤销/重做恢复完整数据，不保留调用方数组引用。
 
 每批 1–100 项操作，全部成功只递增一次修订号并形成一步历史；任何一步非法则整体失败。不允许通过无效中间结构绕过节点、深度或引用约束。成功的同值操作仍递增修订号；空批次拒绝。撤销和重做也检查场景与当前修订，并继续递增修订号；达到最大安全整数后拒绝修改。
 

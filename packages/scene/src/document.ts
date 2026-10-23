@@ -7,6 +7,9 @@ export const SCENE_LIMITS = Object.freeze({
   maxDepth: 32,
   maxIdentifierLength: 64,
   maxTextLength: 10_000,
+  maxChartDataPoints: 100,
+  maxChartCategoryLength: 100,
+  maxChartValue: 1e12,
   maxDimension: 16_384,
   maxPosition: 1_000_000,
   maxRotation: 360_000,
@@ -51,7 +54,22 @@ const commonNodeShape = {
   transform: transformSchema,
   visible: z.boolean(),
 };
+export const barChartDataSchema = z
+  .array(
+    z.strictObject({
+      category: z.string().min(1).max(SCENE_LIMITS.maxChartCategoryLength).regex(/\S/u),
+      value: z.number().min(-SCENE_LIMITS.maxChartValue).max(SCENE_LIMITS.maxChartValue),
+    }),
+  )
+  .max(SCENE_LIMITS.maxChartDataPoints);
+
 export const nodeSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    ...commonNodeShape,
+    type: z.literal('bar-chart'),
+    componentVersion: z.literal(1),
+    data: barChartDataSchema,
+  }),
   z.strictObject({
     ...commonNodeShape,
     type: z.literal('text'),
@@ -117,7 +135,13 @@ function preflight(input: unknown, context: z.RefinementCtx): void {
   // 合法树的引用总数等于节点数，先限制总量，避免在结构校验前遍历大量重复引用。
   let references = Array.isArray(rootIds) ? rootIds.length : 0;
   for (const [index, node] of nodes.entries()) {
-    if (!isRecord(node) || !Array.isArray(node.children)) continue;
+    if (!isRecord(node)) continue;
+    // 数组超限先返回，避免校验器继续逐条解析图表内容。
+    if (Array.isArray(node.data) && node.data.length > SCENE_LIMITS.maxChartDataPoints) {
+      addIssue(context, 'INVALID_VALUE', ['nodes', index, 'data']);
+      return;
+    }
+    if (!Array.isArray(node.children)) continue;
     references += node.children.length;
     if (references > SCENE_LIMITS.maxNodes) {
       addIssue(context, 'INVALID_VALUE', ['nodes', index, 'children']);
@@ -219,6 +243,8 @@ export type SceneDocument = DeepReadonly<z.infer<typeof sceneDocumentSchema>>;
 export type SceneNode = SceneDocument['nodes'][number];
 export type TextNode = Extract<SceneNode, { type: 'text' }>;
 export type RectangleNode = Extract<SceneNode, { type: 'rectangle' }>;
+export type BarChartNode = Extract<SceneNode, { type: 'bar-chart' }>;
+export type BarChartDatum = BarChartNode['data'][number];
 export type GroupNode = Extract<SceneNode, { type: 'group' }>;
 
 export type SceneValidationResult =
@@ -242,6 +268,9 @@ const knownFields = new Set([
   'type',
   'componentVersion',
   'text',
+  'data',
+  'category',
+  'value',
   'children',
 ]);
 

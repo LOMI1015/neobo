@@ -67,6 +67,23 @@ function sceneFixture() {
   };
 }
 
+function chartFixture(data: unknown = [{ category: '分类', value: -12.5 }]) {
+  return {
+    ...createEmptyScene({ id: 'chart-scene', width: 1920, height: 1080 }),
+    rootIds: ['chart-1'],
+    nodes: [
+      {
+        id: 'chart-1',
+        type: 'bar-chart',
+        componentVersion: 1,
+        visible: true,
+        transform: { x: 0, y: 0, width: 480, height: 320, rotation: 0 },
+        data,
+      },
+    ],
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -114,6 +131,28 @@ const invalidScenes = [
     },
   },
   { name: '负修订号', payload: () => ({ ...sceneFixture(), revision: -1 }) },
+  {
+    name: '图表数值不能使用字符串',
+    payload: () => chartFixture([{ category: secret, value: secret }]),
+  },
+  {
+    name: '图表数据行拒绝任意选项',
+    payload: () => chartFixture([{ category: secret, value: 1, [secretKey]: secret }]),
+  },
+  {
+    name: '图表分类不能全为空白',
+    payload: () => chartFixture([{ category: '   ', value: 0 }]),
+  },
+  {
+    name: '图表数据条数超限',
+    payload: () =>
+      chartFixture(
+        Array.from({ length: SCENE_LIMITS.maxChartDataPoints + 1 }, () => ({
+          category: secret,
+          value: 1,
+        })),
+      ),
+  },
   {
     name: '非法画布尺寸',
     payload: () => ({ ...sceneFixture(), canvas: { width: 0, height: 1080 } }),
@@ -280,6 +319,15 @@ describe('场景请求校验真实 NestJS + Fastify 链路', () => {
     });
     assertSafeFailure(response, fixture.output);
     expect(handled).not.toHaveBeenCalled();
+  });
+
+  it('柱状图的静态数据经过共享校验后进入控制器，不记录分类正文', async () => {
+    const fixture = await start();
+    const scene = chartFixture([{ category: secret, value: -12.5 }]);
+    const response = await fixture.app.inject({ method: 'POST', url: route, payload: scene });
+    expect(response.statusCode).toBe(201);
+    expect(handled).toHaveBeenCalledExactlyOnceWith(scene);
+    expect(fixture.output.text()).not.toContain(secret);
   });
 
   it.each([

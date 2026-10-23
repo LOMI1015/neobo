@@ -1,6 +1,6 @@
 # 本地开发
 
-当前提供 React + Vite 二维画布、Web 原子组件注册、统一的 shadcn/ui 公共控件与设计变量、NestJS + Fastify 后端，以及 PostgreSQL、Redis 开发环境。画布支持文字/矩形、选择拖动、属性编辑、组合/拆组及撤销/重做；内容仅在当前会话，刷新后不保存。图表、场景存储、AI、场景主题和完整播放器仍未实现。
+当前提供 React + Vite 二维画布、Web 原子组件注册、统一的 shadcn/ui 公共控件与设计变量、NestJS + Fastify 后端，以及 PostgreSQL、Redis 开发环境。画布支持文字/矩形/静态单系列柱状图、选择拖动、属性编辑、组合/拆组及撤销/重做；内容仅在当前会话，刷新后不保存。动态数据源、场景存储、AI、场景主题和完整播放器仍未实现。
 
 ## 首次启动
 
@@ -25,7 +25,9 @@ pnpm dev
 
 默认进入空白画布；顶部“服务检查”保留原来的 API 状态检查，切换回来保留当前编辑。画布本身不等待 API 连接。添加元素后可直接拖动，按 Shift 多选或从图层选择子元素；属性修改点击“应用属性”后作为一步历史提交。删除组合包括全部后代；拆组保持画面位置，隐藏组合拆开后其直接子元素仍隐藏。
 
-画布和图层支持右键菜单，键盘可用 Shift+F10 打开画布菜单，工具栏“更多操作”提供同等入口。右键未选对象切换目标，命中已选对象或被选中祖先覆盖的后代时保留选区；空白处保留选区，菜单显示当前数量。打开或取消菜单不记历史，菜单操作与工具栏复用同一命令；切换视图时关闭菜单并取消拖动。
+点击“添加柱状图”创建 480×320 的空图表，小画布逐维限制尺寸。属性区用“添加数据”增加分类/数值行，行末按钮删除该行；草稿不会立即写入场景，点击“应用属性”后与坐标、尺寸、可见性修改合为一步历史。可清空全部行，支持负数和零；最多 100 行，类别长度 1–100 且不能全为空白，数值须有限且绝对值不超过 `1e12`。非法输入显示错误并保留原场景。图表使用手填静态数据，不连接 API、数据库或自动刷新。
+
+画布和图层支持右键菜单，聚焦画布后可用 Shift+F10 打开菜单，工具栏“更多操作”提供同等入口。右键未选对象切换目标，命中已选对象或被选中祖先覆盖的后代时保留选区；空白处保留选区，菜单显示当前数量。打开或取消菜单不记历史，菜单操作与工具栏复用同一命令；切换视图时关闭菜单并取消拖动。
 
 只运行前端时，先执行 `pnpm --filter @neobo/scene build`，再运行 `pnpm --filter @neobo/web dev`；根 `pnpm dev` 仍统一管理前后端，任一服务启动失败时会停止关联开发进程。
 
@@ -109,9 +111,17 @@ pnpm --filter @neobo/web ui:add <组件名>
 
 ## 场景组件注册
 
-场景原子组件的 Web 注册接口位于 `apps/web/src/scene/component-registry.ts`，内置声明位于同目录 `components.tsx`；它与前述应用 UI 控件职责不同。当前注册 `text` 和 `rectangle` 的 `componentVersion: 1`，统一管理 `label`、`defaultSize`、`render`，文字另有 `defaultText`。编辑器通过创建入口生成节点，再走原有命令提交；图层与属性标签、`SceneView` 绘制也读取这些声明。
+场景原子组件的 Web 注册接口位于 `apps/web/src/scene/component-registry.ts`，内置声明位于同目录 `components.tsx`；它与前述应用 UI 控件职责不同。当前注册 `text`、`rectangle`、`bar-chart` 的 `componentVersion: 1`，统一管理 `label`、`defaultSize`、`render`，文字另有 `defaultText`，柱状图另有独立冻结的 `defaultData`。编辑器通过创建入口生成节点，再走原有命令提交；图层与属性标签、`SceneView` 绘制也读取这些声明。
 
-只读 `SceneView` 及创建/绘制辅助函数可接收显式注册表，替换已有类型的默认值或表现。组合仍由场景树处理；注册表不会增加共享 Scene v1 的合法类型，不包含图表或动态插件加载。React 绘制回调留在 Web，不进入 `@neobo/scene`；开发示例与限制见 [注册入口说明](../apps/web/src/scene/README.md) 和 [ADR 0007](decisions/0007-component-registry.md)。修改默认值、标签或绘制后按既有检查流程验收，涉及实际画面时执行下方浏览器回归。
+只读 `SceneView` 及创建/绘制辅助函数可接收显式注册表，替换已有类型的默认值或表现。组合仍由场景树处理；注册表不会自行增加共享契约的合法类型，也不加载动态插件。React 与 ECharts 绘制留在 Web，不进入 `@neobo/scene`；开发示例与限制见 [注册入口说明](../apps/web/src/scene/README.md)、[ADR 0007](decisions/0007-component-registry.md) 和 [柱状图决定](decisions/0008-static-bar-chart.md)。
+
+ECharts 6.1.0 的实际绘制代码仅在柱状图出现时懒加载，使用按需 SVG 渲染、显式逻辑尺寸和对称销毁，不为每次拖动或窗口变化新增图表实例。模块加载或图表运行失败时显示固定错误并保留节点编辑入口；已加载模块的运行时失败可在数据或尺寸改变后重建。模块下载失败没有自动重试，编辑数据不能重新下载；刷新会清空当前会话。修改默认值、标签或绘制后按既有检查流程验收，涉及实际画面时执行下方浏览器回归。
+
+## 构建与第三方许可
+
+运行 `pnpm --filter @neobo/web build` 后，Web 产物位于 `apps/web/dist`。Vite 的 `build.license` 生成 `dist/licenses.md`，收录 ECharts、zrender、tslib 等依赖的许可文本；`apps/web/public/echarts-NOTICE` 保留 ECharts 上游 NOTICE 原文，构建时复制为 `dist/echarts-NOTICE`。
+
+分发构建目录时一并保留上述文件。更新图表依赖时核对上游许可和 NOTICE，重新构建并检查产物；第三方许可不代表本仓库整体许可证已确定，也不代表已完成发布或部署。
 
 ## 浏览器验证
 

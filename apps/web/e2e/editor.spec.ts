@@ -11,7 +11,7 @@ async function edit(page: Page, values: Readonly<Record<string, string>>) {
   await page.getByRole('button', { name: '应用属性' }).click();
 }
 
-async function add(page: Page, type: '文字' | '矩形') {
+async function add(page: Page, type: '文字' | '矩形' | '柱状图') {
   await page.getByRole('button', { name: `添加${type}` }).click();
 }
 
@@ -56,6 +56,123 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/health', (route) => route.fulfill({ json: { status: 'ok' } }));
   await page.goto('/');
   await expect(page.getByRole('img', { name: '场景画布' })).toBeVisible();
+});
+
+test('静态柱状图真实绘制分类和正负数，数据缩减、撤销及菜单删除可恢复', async ({
+  page,
+}, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await add(page, '柱状图');
+  const chart = node(page, 'bar-chart-1');
+  await expect(chart.locator('foreignObject svg')).toBeVisible();
+  await expect(chart.locator('foreignObject svg')).toHaveAttribute('width', '480');
+  await expect(page.getByRole('textbox', { name: '分类 1', exact: true })).toHaveCount(0);
+  for (const [index, category, value] of [
+    [1, '分类甲', '24'],
+    [2, '分类乙', '-12'],
+    [3, '零值', '0'],
+  ] as const) {
+    await page.getByRole('button', { name: '添加数据', exact: true }).click();
+    await page.getByRole('textbox', { name: `分类 ${index}`, exact: true }).fill(category);
+    await page.getByRole('textbox', { name: `数值 ${index}`, exact: true }).fill(value);
+  }
+  await edit(page, { 'X 坐标': '420', 'Y 坐标': '180', 宽度: '960', 高度: '600' });
+  const drawing = chart.locator('foreignObject svg');
+  await expect(drawing).toHaveAttribute('width', '960');
+  await expect(drawing.getByText('分类甲', { exact: true })).toBeVisible();
+  await expect(drawing.getByText('分类乙', { exact: true })).toBeVisible();
+  await expect(drawing.getByText('零值', { exact: true })).toBeVisible();
+  const bars = await drawing.locator('path[fill="#5278ba"]').evaluateAll((paths) =>
+    paths.map((path) => {
+      if (!(path instanceof SVGGraphicsElement)) throw new Error('柱形必须是 SVG 图形。');
+      const box = path.getBBox();
+      return { width: box.width, height: box.height };
+    }),
+  );
+  expect(bars.filter((box) => box.width > 0 && box.height > 0)).toHaveLength(2);
+  expect(bars.every((box) => Number.isFinite(box.width) && Number.isFinite(box.height))).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('static-bar-chart.png'), fullPage: true });
+
+  await page.getByRole('button', { name: '删除数据行 3', exact: true }).click();
+  await page.getByRole('button', { name: '删除数据行 2', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: '分类 1', exact: true })
+    .fill('更新<script>文本</script>');
+  await page.getByRole('textbox', { name: '数值 1', exact: true }).fill('7.5');
+  await page.getByRole('button', { name: '应用属性', exact: true }).click();
+  await expect(drawing.getByText('更新<script>文本</script>', { exact: true })).toBeVisible();
+  await expect(chart.locator('script, img')).toHaveCount(0);
+  await expect(drawing.getByText('分类乙', { exact: true })).toHaveCount(0);
+  await expect(drawing.getByText('零值', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(drawing.getByText('分类乙', { exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '数值 2', exact: true })).toHaveValue('-12');
+  const point = await center(page, 'bar-chart-1');
+  await page.mouse.click(point.x, point.y, { button: 'right' });
+  await page
+    .getByRole('menu', { name: '画布操作' })
+    .getByRole('menuitem', { name: '删除', exact: true })
+    .click();
+  await expect(chart).toHaveCount(0);
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(
+    chart.locator('foreignObject svg').getByText('分类甲', { exact: true }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('柱状图在旋转组合中保持几何，隐藏重建与窄屏属性编辑正常', async ({ page }) => {
+  await add(page, '柱状图');
+  await page.getByRole('button', { name: '添加数据', exact: true }).click();
+  await page.getByRole('textbox', { name: '分类 1', exact: true }).fill('中文分类');
+  await page.getByRole('textbox', { name: '数值 1', exact: true }).fill('15');
+  await edit(page, { 'X 坐标': '300', 'Y 坐标': '200', 宽度: '600', 高度: '400' });
+  await expect(node(page, 'bar-chart-1').locator('foreignObject svg')).toHaveAttribute(
+    'width',
+    '600',
+  );
+  await expect(node(page, 'bar-chart-1').locator('foreignObject svg')).toHaveAttribute(
+    'height',
+    '400',
+  );
+  await add(page, '矩形');
+  await edit(page, { 'X 坐标': '950', 'Y 坐标': '400' });
+  await layer(page, 'bar-chart-1').click();
+  await layer(page, 'rectangle-1').click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: '组合', exact: true }).click();
+  await edit(page, { '旋转角度（°）': '30' });
+  const before = await screenCorners(page, 'bar-chart-1');
+  await page.getByRole('button', { name: '拆组', exact: true }).click();
+  sameCorners(await screenCorners(page, 'bar-chart-1'), before);
+  await layer(page, 'bar-chart-1').click();
+  await layer(page, 'bar-chart-1').click({ button: 'right' });
+  await page
+    .getByRole('menu', { name: '图层操作' })
+    .getByRole('menuitem', { name: '隐藏', exact: true })
+    .click();
+  await expect(node(page, 'bar-chart-1')).toHaveCount(0);
+  await layer(page, 'bar-chart-1').click({ button: 'right' });
+  await page
+    .getByRole('menu', { name: '图层操作' })
+    .getByRole('menuitem', { name: '显示', exact: true })
+    .click();
+  await expect(
+    node(page, 'bar-chart-1').locator('foreignObject svg').getByText('中文分类', { exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await layer(page, 'bar-chart-1').click();
+  await page.getByRole('textbox', { name: '分类 1', exact: true }).fill('长分类名称'.repeat(10));
+  await page.getByRole('textbox', { name: '数值 1', exact: true }).fill('');
+  await page.getByRole('button', { name: '应用属性', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await page.getByRole('textbox', { name: '数值 1', exact: true }).fill('-3.5');
+  await page.getByRole('button', { name: '应用属性', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(
+    false,
+  );
+  await expect(node(page, 'bar-chart-1').locator('foreignObject svg')).toBeVisible();
 });
 
 test('文字、矩形与属性编辑通过统一历史恢复，服务切换保留会话', async ({ page }) => {

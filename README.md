@@ -4,7 +4,7 @@
 
 neobo 面向开源、自托管，目标是以原子元素自由组合，将功能底座与独立主题包分离，并接入数据库、接口及多种大模型。
 
-> 当前已提供二维画布（文字、矩形、组合及撤销/重做）、本地数据库环境和 API 请求日志基础。编辑内容仅在当前会话中，保存、主题和 AI 看板功能尚未实现。
+> 当前已提供二维画布（文字、矩形、静态柱状图、组合及撤销/重做）、本地数据库环境和 API 请求日志基础。编辑内容仅在当前会话中，保存、场景主题和 AI 看板功能尚未实现。
 
 ## 设计方向
 
@@ -16,9 +16,9 @@ neobo 面向开源、自托管，目标是以原子元素自由组合，将功�
 
 ## 技术方向
 
-当前使用 TypeScript、React + Vite、shadcn/ui + Tailwind CSS、**NestJS + Fastify**；共享场景包提供契约、校验、命令和历史，本地基础服务为 PostgreSQL、Redis。
+当前使用 TypeScript、React + Vite、shadcn/ui + Tailwind CSS、ECharts SVG 绘制、**NestJS + Fastify**；共享场景包提供契约、校验、命令和历史，本地基础服务为 PostgreSQL、Redis。
 
-ECharts、three.js、BullMQ、数据连接器及模型适配属于后续技术方向。
+three.js、BullMQ、数据连接器及模型适配属于后续技术方向。
 
 ## 本地开发
 
@@ -38,7 +38,9 @@ pnpm dev
 
 应用控件与样式使用统一的 shadcn/ui 公共组件和设计变量，图层及画布提供右键菜单；组件添加与维护见 [前端公共组件](docs/local-development.md#前端公共组件)。
 
-文字、矩形已接入 Web 组件注册入口，统一标签、创建默认值和绘制；开发方式见 [场景组件注册](apps/web/src/scene/README.md)。当前仅支持已有的两种第一版原子元素，未接入图表、动态插件或完整播放器。
+文字、矩形和静态单系列柱状图已接入 Web 组件注册入口，统一标签、创建默认值和绘制；开发方式见 [场景组件注册](apps/web/src/scene/README.md)。柱状图从空数据开始，在属性区增删分类/数值行后应用，一次提交可整体撤销；不连接动态数据源。图表代码按需加载，动态插件和完整播放器仍待实现。
+
+Web 构建产物包含第三方依赖许可 `licenses.md` 与 `echarts-NOTICE`，分发时需随构建目录保留；路径和维护方式见 [本地开发](docs/local-development.md#构建与第三方许可)。
 
 执行 `pnpm check` 检查格式、文档、工作流规则，先按依赖顺序构建，再执行所有业务包的 `lint`、`typecheck`、`test`；缺少检查时 CI 失败。
 
