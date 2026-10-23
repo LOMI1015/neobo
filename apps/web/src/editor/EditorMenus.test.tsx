@@ -164,8 +164,9 @@ describe('编辑器上下文菜单与可见操作入口', () => {
     render(<Editor />);
     const menu = await openContext(screen.getByRole('img', { name: '场景画布' }));
     expect(menu.getByText('当前已选 0 项')).toBeVisible();
-    for (const item of menu.getAllByRole('menuitem'))
-      expect(item).toHaveAttribute('aria-disabled', 'true');
+    for (const name of ['组合', '拆组', '隐藏 / 显示', '删除', '撤销', '重做'])
+      expect(menu.getByRole('menuitem', { name })).toHaveAttribute('aria-disabled', 'true');
+    expect(menu.getByRole('menuitem', { name: '场景主题' })).not.toHaveAttribute('aria-disabled');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
@@ -212,6 +213,7 @@ describe('编辑器上下文菜单与可见操作入口', () => {
     const { rerender } = render(<Editor initialDocument={scene([rectangle('a')])} />);
     await openContext(nodeElement('a'));
     rerender(<Editor initialDocument={scene([rectangle('a')])} active={false} />);
+    expect(screen.getByRole('button', { name: '更多操作' })).toBeDisabled();
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
     expect(document.body.style.pointerEvents).not.toBe('none');
     rerender(<Editor initialDocument={scene([rectangle('a')])} active />);
@@ -224,6 +226,7 @@ describe('编辑器上下文菜单与可见操作入口', () => {
     render(<Editor initialDocument={scene([rectangle('a')])} />);
     const fixture = installPointerFixture();
     fireEvent.pointerDown(nodeElement('a'), { button: 0, clientX: 20, clientY: 30 });
+    expect(screen.getByRole('button', { name: '更多操作' })).toBeDisabled();
     fireEvent.contextMenu(nodeElement('a'), { clientX: 100, clientY: 100 });
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(fixture.captured.size).toBe(1);

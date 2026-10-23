@@ -1,4 +1,10 @@
 import { createEmptyScene, type BarChartNode, type SceneDocument } from '@neobo/scene/document';
+import {
+  DEFAULT_SCENE_THEME,
+  resolveSceneTheme,
+  SCENE_THEMES,
+  type SceneThemeReference,
+} from '@neobo/theme';
 import { render, screen } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -48,6 +54,20 @@ function view(node: BarChartNode) {
   );
 }
 
+function themedView(node: BarChartNode, theme?: SceneThemeReference) {
+  const document: SceneDocument = {
+    ...createEmptyScene({ id: 'themed-chart', width: 960, height: 540 }),
+    ...(theme ? { theme } : {}),
+    nodes: [node],
+    rootIds: [node.id],
+  };
+  return (
+    <svg>
+      <SceneView document={document} />
+    </svg>
+  );
+}
+
 function latestChart() {
   const chart = charts.instances.at(-1);
   if (!chart) throw new Error('图表测试实例未建立。');
@@ -64,6 +84,47 @@ beforeEach(() => {
 });
 
 describe('柱状图绘制适配与资源生命周期', () => {
+  it.each(SCENE_THEMES)('$label的柱、文字、轴线和网格完整传给图表', async (theme) => {
+    render(themedView(initial, { id: theme.id, version: theme.version }));
+    await screen.findByRole('img', { name: '柱状图' });
+    const axis = {
+      axisLabel: { color: theme.tokens.chartText },
+      axisLine: { lineStyle: { color: theme.tokens.chartAxis } },
+      axisTick: { lineStyle: { color: theme.tokens.chartAxis } },
+    };
+    expect(latestChart().setOption.mock.calls[0]?.[0]).toMatchObject({
+      textStyle: { color: theme.tokens.chartText },
+      xAxis: axis,
+      yAxis: { ...axis, splitLine: { lineStyle: { color: theme.tokens.chartGrid } } },
+      series: [{ itemStyle: { color: theme.tokens.chartBar } }],
+    });
+  });
+
+  it('主题切换复用实例且只更新配置，缺省主题和等值文档副本不重复绘制', async () => {
+    const light = { id: 'neutral-light', version: 1 } as const;
+    const dark = { id: 'deep-blue', version: 1 } as const;
+    const { rerender } = render(themedView(initial));
+    await screen.findByRole('img', { name: '柱状图' });
+    const chart = latestChart();
+    rerender(themedView(structuredClone(initial), light));
+    expect(chart.setOption).toHaveBeenCalledTimes(1);
+    rerender(themedView(initial, dark));
+    expect(chart.setOption).toHaveBeenCalledTimes(2);
+    expect(chart.setOption.mock.lastCall?.[0]).toMatchObject({
+      series: [{ itemStyle: { color: resolveSceneTheme(dark).tokens.chartBar } }],
+    });
+    rerender(themedView(structuredClone(initial), structuredClone(dark)));
+    expect(chart.setOption).toHaveBeenCalledTimes(2);
+    rerender(themedView(initial));
+    expect(chart.setOption).toHaveBeenCalledTimes(3);
+    expect(chart.setOption.mock.lastCall?.[0]).toMatchObject({
+      series: [{ itemStyle: { color: DEFAULT_SCENE_THEME.tokens.chartBar } }],
+    });
+    expect(charts.init).toHaveBeenCalledTimes(1);
+    expect(chart.resize).not.toHaveBeenCalled();
+    expect(chart.dispose).not.toHaveBeenCalled();
+  });
+
   it('只注册柱图、直角坐标与SVG；使用HTML容器及节点逻辑尺寸', async () => {
     vi.resetModules();
     await import('../src/BarChartSurface.js');
@@ -105,21 +166,17 @@ describe('柱状图绘制适配与资源生命周期', () => {
     const chart = latestChart();
     rerender(view({ ...initial, data: [{ category: '更新', value: -10 }] }));
     expect(charts.init).toHaveBeenCalledTimes(1);
-    expect(chart.setOption).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        xAxis: { type: 'category', data: ['更新'] },
-        series: [expect.objectContaining({ type: 'bar', data: [-10] })],
-      }),
-      { notMerge: true, silent: true },
-    );
+    expect(chart.setOption.mock.lastCall?.[0]).toMatchObject({
+      xAxis: { type: 'category', data: ['更新'] },
+      series: [{ type: 'bar', data: [-10] }],
+    });
+    expect(chart.setOption.mock.lastCall?.[1]).toEqual({ notMerge: true, silent: true });
     rerender(view({ ...initial, data: [] }));
-    expect(chart.setOption).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        xAxis: { type: 'category', data: [] },
-        series: [expect.objectContaining({ data: [] })],
-      }),
-      { notMerge: true, silent: true },
-    );
+    expect(chart.setOption.mock.lastCall?.[0]).toMatchObject({
+      xAxis: { type: 'category', data: [] },
+      series: [{ data: [] }],
+    });
+    expect(chart.setOption.mock.lastCall?.[1]).toEqual({ notMerge: true, silent: true });
     expect(chart.resize).not.toHaveBeenCalled();
     expect(chart.dispose).not.toHaveBeenCalled();
   });
@@ -218,6 +275,49 @@ describe('柱状图绘制适配与资源生命周期', () => {
     expect(screen.getByRole('img', { name: '柱状图' })).toBeInTheDocument();
     expect(charts.instances).toHaveLength(1);
   });
+
+  it.each(['init', 'setOption', 'resize'] as const)(
+    '%s失败后等值主题副本不重试，切换主题可恢复已加载的绘制模块',
+    async (method) => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      if (method === 'init')
+        charts.init.mockImplementationOnce(() => {
+          throw new Error('synthetic-theme-error');
+        });
+      const { rerender, unmount } = render(themedView(initial));
+      let failed: ReturnType<typeof charts.create> | undefined;
+      const next =
+        method === 'resize'
+          ? { ...initial, transform: { ...initial.transform, width: 600 } }
+          : initial;
+      if (method !== 'init') {
+        await screen.findByRole('img', { name: '柱状图' });
+        failed = latestChart();
+        failed[method].mockImplementationOnce(() => {
+          throw new Error('synthetic-theme-error');
+        });
+        rerender(themedView(next, { id: 'deep-blue', version: 1 }));
+      }
+      expect(await screen.findByRole('alert')).toHaveTextContent(/^柱状图绘制失败。$/);
+      const calls = charts.init.mock.calls.length;
+      const failedTheme = method === 'init' ? 'neutral-light' : 'deep-blue';
+      rerender(themedView(structuredClone(next), { id: failedTheme, version: 1 }));
+      expect(charts.init).toHaveBeenCalledTimes(calls);
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      rerender(
+        themedView(next, { id: method === 'init' ? 'deep-blue' : 'neutral-light', version: 1 }),
+      );
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(charts.init).toHaveBeenCalledTimes(calls + 1);
+      const recovered = latestChart();
+      expect(recovered).not.toBe(failed);
+      expect(recovered.resize).not.toHaveBeenCalled();
+      if (failed) expect(failed.dispose).toHaveBeenCalledTimes(1);
+      unmount();
+      expect(recovered.dispose).toHaveBeenCalledTimes(1);
+      if (failed) expect(failed.dispose).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it.each(['setOption', 'resize'] as const)(
     '%s失败释放实例且不重复销毁，后续修改可恢复',

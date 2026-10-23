@@ -12,6 +12,7 @@ const scene = {
   id: 'independent-consumer',
   revision: 0,
   canvas: { width: 960, height: 540 },
+  theme: { id: 'deep-blue', version: 1 },
   rootIds: ['title', 'chart'],
   nodes: [
     {

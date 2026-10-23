@@ -278,6 +278,9 @@ importers:
       '@neobo/scene':
         specifier: workspace:*
         version: link:../../packages/scene
+      '@neobo/theme':
+        specifier: workspace:*
+        version: link:../../packages/theme
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
@@ -324,6 +327,9 @@ importers:
       '@neobo/scene':
         specifier: workspace:*
         version: link:../scene
+      '@neobo/theme':
+        specifier: workspace:*
+        version: link:../theme
       echarts:
         specifier: 6.1.0
         version: 6.1.0
@@ -348,6 +354,15 @@ importers:
         version: 8.3.5(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.1)
 
   packages/scene:
+    dependencies:
+      '@neobo/theme':
+        specifier: workspace:*
+        version: link:../theme
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
+  packages/theme:
     dependencies:
       zod:
         specifier: 4.6.7

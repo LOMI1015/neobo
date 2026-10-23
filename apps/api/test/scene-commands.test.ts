@@ -185,6 +185,68 @@ describe('场景命令经过真实 NestJS 与 Fastify 请求边界', () => {
     expect(fixture.output()).not.toContain(secret);
   });
 
+  it('主题切换经过HTTP命令和历史，非法引用不进入执行器，后续失败原子回滚', async () => {
+    const fixture = await start();
+    await fixture.app.inject({ method: 'POST', url: route, payload: batch() });
+    const original = fixture.history.current();
+    const switchTheme = {
+      sceneId,
+      baseRevision: 1,
+      operations: [{ type: 'scene.theme.set', theme: { id: 'deep-blue', version: 1 } }],
+    };
+    const changed = await fixture.app.inject({ method: 'POST', url: route, payload: switchTheme });
+    expect(changed.statusCode).toBe(201);
+    expect(fixture.history.current()).toEqual({
+      ...original,
+      revision: 2,
+      theme: { id: 'deep-blue', version: 1 },
+    });
+    const undo = await fixture.app.inject({
+      method: 'POST',
+      url: `${route}/undo`,
+      payload: { sceneId, baseRevision: 2 },
+    });
+    expect(undo.statusCode).toBe(201);
+    expect(fixture.history.current()).toEqual({ ...original, revision: 3 });
+    const redo = await fixture.app.inject({
+      method: 'POST',
+      url: `${route}/redo`,
+      payload: { sceneId, baseRevision: 3 },
+    });
+    expect(redo.statusCode).toBe(201);
+    expect(fixture.history.current().theme).toEqual({ id: 'deep-blue', version: 1 });
+    const before = fixture.history.current();
+    const execute = vi.spyOn(fixture.history, 'execute');
+    const invalid = await fixture.app.inject({
+      method: 'POST',
+      url: route,
+      payload: {
+        ...switchTheme,
+        baseRevision: 4,
+        operations: [{ type: 'scene.theme.set', theme: { id: secret, version: 1 } }],
+      },
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(execute).not.toHaveBeenCalled();
+    const failed = await fixture.app.inject({
+      method: 'POST',
+      url: route,
+      payload: {
+        ...switchTheme,
+        baseRevision: 4,
+        operations: [
+          { type: 'scene.theme.set', theme: { id: 'neutral-light', version: 1 } },
+          { type: 'node.remove', nodeId: 'missing' },
+        ],
+      },
+    });
+    expect(failed.statusCode).toBe(400);
+    expect(fixture.history.current()).toEqual(before);
+    expect(invalid.body).not.toContain(secret);
+    expect(fixture.output()).not.toContain(secret);
+    expect(fixture.output()).not.toContain('deep-blue');
+  });
+
   it('柱状图添加、数据替换与删除复用HTTP命令和撤销，非法数据不进入执行器', async () => {
     const fixture = await start();
     const node = {

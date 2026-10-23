@@ -119,6 +119,21 @@ function captureOutput() {
 const invalidScenes = [
   { name: '未知文档版本', payload: () => ({ ...sceneFixture(), schemaVersion: 2 }) },
   {
+    name: '未知场景主题',
+    payload: () => ({ ...sceneFixture(), theme: { id: secret, version: 1 } }),
+  },
+  {
+    name: '未知主题版本',
+    payload: () => ({ ...sceneFixture(), theme: { id: 'deep-blue', version: 2 } }),
+  },
+  {
+    name: '主题引用拒绝额外配置',
+    payload: () => ({
+      ...sceneFixture(),
+      theme: { id: 'deep-blue', version: 1, [secretKey]: secret },
+    }),
+  },
+  {
     name: '未知组件版本',
     payload: () => {
       const scene = sceneFixture();
@@ -328,6 +343,18 @@ describe('场景请求校验真实 NestJS + Fastify 链路', () => {
     expect(response.statusCode).toBe(201);
     expect(handled).toHaveBeenCalledExactlyOnceWith(scene);
     expect(fixture.output.text()).not.toContain(secret);
+  });
+
+  it('场景主题引用经过真实请求校验，正文不进入日志', async () => {
+    const fixture = await start();
+    const scene = { ...chartFixture(), theme: { id: 'deep-blue', version: 1 } };
+    const response = await fixture.app.inject({ method: 'POST', url: route, payload: scene });
+    expect(response.statusCode).toBe(201);
+    expect(handled).toHaveBeenCalledExactlyOnceWith(scene);
+    const parsed = handled.mock.calls[0]?.[0];
+    expect(parsed?.theme).toEqual(scene.theme);
+    expect(parsed?.theme).not.toBe(scene.theme);
+    expect(fixture.output.text()).not.toContain('deep-blue');
   });
 
   it.each([

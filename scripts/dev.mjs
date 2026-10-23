@@ -41,6 +41,7 @@ export async function runDevelopment({
   try {
     // 按依赖顺序首次构建，再使用同一增量模式监听，避免首启重复写入。
     for (const [packageName, name, color] of [
+      ['@neobo/theme', 'THEME', 'yellow'],
       ['@neobo/scene', 'SCENE', 'gray'],
       ['@neobo/player', 'PLAYER', 'blue'],
     ]) {
@@ -57,6 +58,7 @@ export async function runDevelopment({
     }
     const { result } = run(
       [
+        { command: 'pnpm --filter @neobo/theme dev', name: 'THEME', env: childEnvironment },
         { command: 'pnpm --filter @neobo/scene dev', name: 'SCENE', env: childEnvironment },
         { command: 'pnpm --filter @neobo/player dev', name: 'PLAYER', env: childEnvironment },
         { command: 'pnpm --filter @neobo/api dev', name: 'API', env: childEnvironment },
@@ -66,7 +68,7 @@ export async function runDevelopment({
         cwd: workspaceRoot,
         outputStream: output,
         prefix: '[{color}{name}{/color}]',
-        prefixColors: colors ? ['gray', 'blue', 'cyan', 'magenta'] : false,
+        prefixColors: colors ? ['yellow', 'gray', 'blue', 'cyan', 'magenta'] : false,
         killOthersOn: ['success', 'failure'],
         successCondition: 'all',
       },

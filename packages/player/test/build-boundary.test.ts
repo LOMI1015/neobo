@@ -18,6 +18,7 @@ const playerRoot = fileURLToPath(new URL('../', import.meta.url));
 const fixtureRoot = fileURLToPath(new URL('./fixtures/consumer/', import.meta.url));
 const playerEntry = normalizePath(fileURLToPath(new URL('../dist/index.js', import.meta.url)));
 const sceneRoot = normalizePath(fileURLToPath(new URL('../../scene/', import.meta.url)));
+const themeRoot = normalizePath(fileURLToPath(new URL('../../theme/', import.meta.url)));
 const webRoot = normalizePath(fileURLToPath(new URL('../../../apps/web/', import.meta.url)));
 const runtimeExports = [
   'ScenePlayer',
@@ -85,6 +86,7 @@ it('已构建公共出口可独立消费，生产模块图与懒加载产物不�
   expect(publicExports.toSorted()).toEqual(runtimeExports.toSorted());
   expect(moduleIds).toContain(playerEntry);
   expect(moduleIds).toContain(`${sceneRoot}dist/document.js`);
+  expect(moduleIds).toContain(`${themeRoot}dist/index.js`);
   expect(moduleIds.some((id) => id.includes('/packages/player/dist/SceneView.js'))).toBe(true);
   expect(moduleIds.some((id) => id.includes('/node_modules/echarts/lib/chart/bar/'))).toBe(true);
   expect(moduleIds.some((id) => id.includes('/node_modules/zrender/lib/svg/'))).toBe(true);
@@ -93,6 +95,7 @@ it('已构建公共出口可独立消费，生产模块图与懒加载产物不�
       (id) =>
         id.startsWith(webRoot) ||
         id.includes('/packages/player/src/') ||
+        id.includes('/packages/theme/src/') ||
         /\/node_modules\/(?:@radix-ui\/|radix-ui\/|shadcn\/)/u.test(id) ||
         ['index', 'commands', 'history', 'geometry'].some(
           (name) => id === `${sceneRoot}dist/${name}.js`,
